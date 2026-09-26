@@ -22,7 +22,9 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "npm run typecheck -w @app/api && npm run typecheck -w @app/web",
     "check": "npm run lint && npm run typecheck && npm test",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "docker:build": "docker build -t call-calendar .",
+    "docker:run": "docker run --rm -p 3000:3000 call-calendar"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
