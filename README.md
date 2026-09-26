@@ -10,20 +10,45 @@
 
 ## Стек
 
-- Разное
+- Node.js 24, TypeScript, npm workspaces
+- Backend: Fastify 5 (нативный запуск TypeScript без компиляции)
+- Frontend: React 19, Vite
+- Тесты: Vitest (+ React Testing Library), smoke test
+- Линт: ESLint 10 (flat config)
+- CI: GitHub Actions; Docker (multi-stage)
 
 ## Установка
 
-<!-- Опишите установку: клонирование, зависимости, переменные окружения -->
+Требования: Node.js 24+ (см. `.nvmrc`), npm 11.
 
 ```bash
 git clone https://github.com/yozhikOm/ai-for-developers-project-386.git
 cd ai-for-developers-project-386
+npm install
 ```
+
+Переменные окружения — по необходимости: скопируйте `.env.example` в `.env`
+(по умолчанию порт 3000).
 
 ## Использование
 
-<!-- Добавьте примеры запуска и запись asciinema — именно это смотрит работодатель -->
+```bash
+# Dev-режим (два терминала)
+npm run dev:api        # backend: http://localhost:3000
+npm run dev:web        # frontend: http://localhost:5173 (прокси /api → 3000)
+
+# Prod-режим (один процесс, порт 3000)
+npm run build
+npm start
+
+# Проверки
+npm run check          # lint + typecheck + тесты
+npm run smoke          # smoke test запущенного приложения (после npm run build)
+
+# Docker
+npm run docker:build   # сборка образа call-calendar
+npm run docker:run     # запуск на http://localhost:3000
+```
 
 ---
 
