@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   test: {
+    name: 'web',
     // Секция для Vitest: React-компоненты тестируем в jsdom
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
