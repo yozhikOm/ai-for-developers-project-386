@@ -10,5 +10,12 @@
   },
   "workspaces": [
     "apps/*"
-  ]
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.2"
+  }
 }
