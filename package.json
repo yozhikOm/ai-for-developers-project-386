@@ -1,0 +1,14 @@
+{
+  "name": "call-calendar",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Сервис бронирования календаря (учебный проект Хекслета)",
+  "type": "module",
+  "packageManager": "npm@11.12.0",
+  "engines": {
+    "node": ">=24.12"
+  },
+  "workspaces": [
+    "apps/*"
+  ]
+}
