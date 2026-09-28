@@ -95,3 +95,4 @@ describe('404 и SPA-fallback', () => {
     });
   });
 });
+
