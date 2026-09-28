@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  verify:
+    name: lint, typecheck, test, build, smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test
+        run: npm run smoke
+
+  docker:
+    name: docker image
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t call-calendar .
+
+      - name: Run container
+        run: docker run -d --name app -p 3100:3000 call-calendar
+
+      - name: Smoke test container
+        run: |
+          curl --fail --retry 10 --retry-delay 1 --retry-connrefused http://localhost:3100/api/health
+          curl -fsS http://localhost:3100/ | grep -q 'id="root"'
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs app
