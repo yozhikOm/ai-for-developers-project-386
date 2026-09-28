@@ -25,7 +25,7 @@ export async function buildApp() {
     // SPA-fallback: на неизвестные GET-маршруты (кроме /api) отдаём index.html.
     // Для неизвестных API-маршрутов — обычный JSON 404.
     app.setNotFoundHandler((request, reply) => {
-      if (request.method !== 'GET' || request.url.startsWith('/api')) {
+      if (request.method !== 'GET' || request.url === '/api' || request.url.startsWith('/api/')) {
         reply.code(404).send({ error: 'Not Found' });
         return;
       }
