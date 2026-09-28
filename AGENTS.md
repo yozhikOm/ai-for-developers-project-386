@@ -56,6 +56,27 @@ Backend запускается Node.js 24 напрямую из `.ts`-исход
 - Фоновые серверы после проверок останавливать (Windows: `taskkill //PID <pid> //F`),
   не оставлять зомби-процессы.
 
+## Коммиты и релизы
+
+- Формат коммитов — [Conventional Commits](https://www.conventionalcommits.org/):
+  `type(scope): описание`, например `feat(api): добавить эндпоинт бронирования`.
+  Основные типы: `feat`, `fix`, `docs`, `test`, `build`, `ci`, `refactor`,
+  `chore`. `scope` — затронутая часть: `api`, `web`, `root` (или конкретный
+  модуль).
+- Правило обязательно к соблюдению для коммитов ИИ-агента: дальше по проекту
+  коммиты делает преимущественно он, а формат напрямую определяет
+  автоматический релизный процесс — `release-please` разбирает историю
+  коммитов, чтобы посчитать версию по semver и собрать changelog.
+  `fix` → патч-версия, `feat` → минорная; `!` после типа/скоупа
+  (`feat(api)!: ...`) или футер `BREAKING CHANGE:` в теле коммита →
+  мажорная. Коммиты без Conventional Commits формата в релизный процесс
+  не попадают.
+- Релизы автоматизированы отдельным workflow
+  `.github/workflows/release-please.yml` (не путать с `ci.yml`): по пушам
+  в `main` он держит актуальный release-PR (версия + `CHANGELOG.md`);
+  при его мерже создаются git-тег и GitHub Release. Конфиг —
+  `release-please-config.json` и `.release-please-manifest.json` в корне.
+
 ## Ограничения
 
 - `.github/workflows/hexlet-check.yml` — **не изменять и не удалять**.
