@@ -82,3 +82,20 @@ Backend запускается Node.js 24 напрямую из `.ts`-исход
 - `.github/workflows/hexlet-check.yml` — **не изменять и не удалять**.
 - `.env` не коммитить; шаблон переменных — `.env.example`.
 - CI живёт в `.github/workflows/ci.yml` (lint, typecheck, тесты, build, smoke, Docker).
+
+## Agent skills
+
+### Issue tracker
+
+Задачи ведутся в GitHub Issues репозитория `yozhikOm/ai-for-developers-project-386`,
+все операции — через CLI `gh`. См. `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Дефолтный словарь из пяти канонических ролей: `needs-triage`, `needs-info`,
+`ready-for-agent`, `ready-for-human`, `wontfix`. См. `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Раскладка single-context: один `GLOSSARY.md` и `docs/adr/` в корне репозитория.
+См. `docs/agents/domain.md`.
