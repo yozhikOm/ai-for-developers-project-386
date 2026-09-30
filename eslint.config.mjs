@@ -29,4 +29,13 @@ export default defineConfig(
       globals: globals.browser,
     },
   },
+  {
+    // Компоненты shadcn/ui — сгенерированный код, обновляемый через `shadcn add`.
+    // Они намеренно экспортируют вместе с компонентом и variants-функцию (cva),
+    // что конфликтует с react-refresh/only-export-components.
+    files: ['apps/web/src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 )
