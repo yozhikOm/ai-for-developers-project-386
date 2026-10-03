@@ -10,7 +10,7 @@ beta-плагин `fastify`) в `apps/api/src/generated/` вместе с коп
 (`output.source`). Маршруты и проверку запросов в рантайме регистрирует
 `fastify-openapi-glue` по этой копии, поэтому `apps/api` и Docker-образ не
 зависят от файлов вне `apps/api`. Исследование и сквозной прогон —
-`docs/research/openapi-generators.md` на ветке `research/openapi-generators`.
+[`docs/research/openapi-generators.md`](../research/openapi-generators.md).
 
 ## Considered Options
 
