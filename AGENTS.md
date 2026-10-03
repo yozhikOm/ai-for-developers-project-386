@@ -12,11 +12,18 @@
 
 Монорепозиторий (npm workspaces):
 
+- `contract/` — TypeSpec-контракт API (`main.tsp`), единый источник правды
+  (ADR 0003, 0004). Изменение API начинается с него, затем `npm run generate`.
+  Каталоги `generated/` (`contract/`, `apps/api/src/`, `apps/web/src/api/`) —
+  вывод генерации: коммитятся, руками не правятся, CI ловит дрейф.
 - `apps/api` — backend: Fastify 5, TypeScript, нативный type stripping Node 24
   (без шага компиляции). `src/app.ts` — фабрика `buildApp()` (маршруты, статика),
-  `src/index.ts` — точка входа (listen). Новые маршруты — новые файлы в `src/routes/`.
+  `src/index.ts` — точка входа (listen). Маршруты регистрирует `fastify-openapi-glue`
+  по контракту; обработчик операции — в `src/handlers/`, ключ — её `operationId`
+  (тип `RouteHandlers` требует все). Ошибки — `ApiError` из `src/errors.ts`.
 - `apps/web` — frontend: React 19, TypeScript, Vite. В dev-режиме proxy `/api` →
-  `localhost:3000`.
+  `localhost:3000`. Запросы к API — только через сгенерированный SDK
+  (`@/api/generated`).
 - `scripts/smoke.mjs` — smoke test на чистом Node, без зависимостей.
 - `vitest.config.ts` (корень) — единый запуск тестов, `projects: ['apps/*']`;
   окружение каждый пакет описывает в своём конфиге.
@@ -28,7 +35,8 @@
 | Команда | Назначение |
 | --- | --- |
 | `npm run dev:api` / `npm run dev:web` | dev-режим (два терминала; web на 5173, api на 3000) |
-| `npm run check` | lint + typecheck + тесты. **Запускать обязательно перед завершением любой задачи** |
+| `npm run generate` | контракт → OpenAPI, SDK для web, типы и копия спеки для api. После правки `contract/` |
+| `npm run check` | lint + typecheck + тесты (без генерации). **Запускать обязательно перед завершением любой задачи** |
 | `npm run build` | сборка frontend в `apps/web/dist` |
 | `npm start` | prod-режим: один процесс, порт 3000 (API + статика) |
 | `npm run smoke` | smoke test запущенного приложения (требует предварительный `npm run build`) |
@@ -81,7 +89,8 @@ Backend запускается Node.js 24 напрямую из `.ts`-исход
 
 - `.github/workflows/hexlet-check.yml` — **не изменять и не удалять**.
 - `.env` не коммитить; шаблон переменных — `.env.example`.
-- CI живёт в `.github/workflows/ci.yml` (lint, typecheck, тесты, build, smoke, Docker).
+- CI живёт в `.github/workflows/ci.yml` (дрейф генерации, lint, typecheck, тесты,
+  build, smoke, Docker).
 
 ## Agent skills
 

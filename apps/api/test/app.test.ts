@@ -38,6 +38,21 @@ describe('404 и SPA-fallback', () => {
 
       await app.close();
     });
+
+    it.each([
+      ['GET', '/api'],
+      ['GET', '/api/unknown'],
+      ['POST', '/api/owner'],
+    ] as const)('на неизвестный /api-маршрут %s %s отвечает ApiError NOT_FOUND', async (method, url) => {
+      const app = await buildApp();
+
+      const response = await app.inject({ method, url });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ code: 'NOT_FOUND', message: expect.any(String) });
+
+      await app.close();
+    });
   });
 
   describe('когда web/dist собран', () => {
@@ -50,13 +65,13 @@ describe('404 и SPA-fallback', () => {
       await rm(webDistDir, { recursive: true, force: true });
     });
 
-    it('отдаёт JSON 404 на неизвестный /api-маршрут', async () => {
+    it('отдаёт ApiError NOT_FOUND на неизвестный /api-маршрут', async () => {
       const app = await buildApp();
 
       const response = await app.inject({ method: 'GET', url: '/api/unknown' });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: 'Not Found' });
+      expect(response.json()).toEqual({ code: 'NOT_FOUND', message: expect.any(String) });
 
       await app.close();
     });

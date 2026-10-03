@@ -109,6 +109,16 @@ async function main() {
     assert(body.status === 'ok', `неожиданное тело: ${JSON.stringify(body)}`);
   });
 
+  await check('GET /api/owner → 200, имя и пояс Owner', async () => {
+    const response = await fetch(`${baseUrl}/api/owner`);
+    assert(response.status === 200, `ожидали 200, получили ${response.status}`);
+    const body = await response.json();
+    assert(
+      typeof body.name === 'string' && body.name.length > 0 && typeof body.timezone === 'string',
+      `неожиданное тело: ${JSON.stringify(body)}`,
+    );
+  });
+
   await check('GET / → 200, HTML с <div id="root">', async () => {
     const response = await fetch(`${baseUrl}/`);
     assert(response.status === 200, `ожидали 200, получили ${response.status}`);

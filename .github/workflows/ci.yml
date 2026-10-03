@@ -23,6 +23,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check generated code is up to date
+        # Сгенерированное из contract/ коммитится и руками не правится (ADR 0004):
+        # падаем, если оно разошлось с контрактом. --intent-to-add нужен, чтобы
+        # git diff увидел и новые, ещё не закоммиченные файлы генерации
+        run: |
+          npm run generate
+          git add --intent-to-add --all
+          git diff --exit-code
+
       - name: Lint
         run: npm run lint
 
