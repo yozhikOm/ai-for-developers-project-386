@@ -22,11 +22,11 @@ export async function registerApiErrors(app: FastifyInstance) {
   app.setErrorHandler((error: FastifyError, request, reply) => {
     const statusCode = error.statusCode ?? 500;
 
-    // Отказы клиента: ошибки валидации Fastify (error.validation), битый JSON,
+    // Запрос не прошёл проверку: ошибки валидации Fastify (error.validation), битый JSON,
     // неподдерживаемый Content-Type и т. п. Статус сохраняем, текст — от Fastify.
+    // Бизнес-отказы (EVENT_TYPE_NOT_FOUND и др.) обработчики отправляют сами.
     if (error.validation || (statusCode >= 400 && statusCode < 500)) {
-      const code = statusCode === 404 ? 'NOT_FOUND' : 'VALIDATION_ERROR';
-      reply.code(error.validation ? 400 : statusCode).send(apiError(code, error.message));
+      reply.code(error.validation ? 400 : statusCode).send(apiError('VALIDATION_ERROR', error.message));
       return;
     }
 

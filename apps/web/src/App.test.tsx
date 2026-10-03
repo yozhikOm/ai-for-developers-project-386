@@ -39,6 +39,7 @@ describe('публичная страница Owner', () => {
     renderApp('/')
 
     expect(await screen.findByRole('heading', { name: 'Анна Смирнова' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Забронировать звонок' })).toHaveAttribute('href', '/booking')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
