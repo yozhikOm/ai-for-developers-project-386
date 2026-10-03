@@ -1,0 +1,86 @@
+openapi: 3.0.0
+info:
+  title: Календарь звонков
+  version: 0.0.0
+tags: []
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      description: 'Проверка живости: используется smoke-тестом и Docker HEALTHCHECK.'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/owner:
+    get:
+      operationId: getOwner
+      description: Имя и часовой пояс Owner.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Owner'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+components:
+  schemas:
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          $ref: '#/components/schemas/ApiErrorCode'
+        message:
+          type: string
+          description: Описание для разработчика; пользователю UI показывает свой текст по `code`.
+      description: Единая модель ошибки API.
+    ApiErrorCode:
+      type: string
+      enum:
+        - VALIDATION_ERROR
+        - NOT_FOUND
+        - INTERNAL_ERROR
+      description: 'Машиночитаемая причина ошибки: клиент различает отказы по ней, а не по тексту.'
+    Health:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+      description: Ответ проверки живости.
+    Owner:
+      type: object
+      required:
+        - name
+        - timezone
+      properties:
+        name:
+          type: string
+          description: Имя, которое видит Guest на публичной странице.
+        timezone:
+          type: string
+          description: 'IANA-пояс Owner (например, `Europe/Moscow`): в нём считается и показывается время.'
+      description: Owner — владелец календаря; задаётся конфигурацией сервера.

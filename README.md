@@ -28,7 +28,7 @@ npm install
 ```
 
 Переменные окружения — по необходимости: скопируйте `.env.example` в `.env`
-(по умолчанию порт 3000).
+(порт, имя и часовой пояс владельца календаря; у всех есть значения по умолчанию).
 
 ## Использование
 
@@ -40,6 +40,9 @@ npm run dev:web        # frontend: http://localhost:5173 (прокси /api → 
 # Prod-режим (один процесс, порт 3000)
 npm run build
 npm start
+
+# Контракт API (contract/) → OpenAPI, SDK для frontend, артефакты для backend
+npm run generate
 
 # Проверки
 npm run check          # lint + typecheck + тесты

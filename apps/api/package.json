@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@fastify/static": "^10.1.5",
-    "fastify": "^5.12.5"
+    "fastify": "^5.12.5",
+    "fastify-openapi-glue": "^4.11.5"
   }
 }
