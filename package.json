@@ -24,10 +24,16 @@
     "check": "npm run lint && npm run typecheck && npm test",
     "smoke": "node scripts/smoke.mjs",
     "docker:build": "docker build -t call-calendar .",
-    "docker:run": "docker run --rm -p 3000:3000 call-calendar"
+    "docker:run": "docker run --rm -p 3000:3000 call-calendar",
+    "generate": "tsp compile contract && openapi-ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@typespec/compiler": "^1.16.0",
+    "@typespec/http": "^1.16.0",
+    "@typespec/openapi": "^1.16.0",
+    "@typespec/openapi3": "^1.16.0",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",

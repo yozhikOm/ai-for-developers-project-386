@@ -1,20 +1,55 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.tsx'
 
-describe('App', () => {
-  it('ведёт с главной страницы на страницу записи по кнопке', async () => {
-    render(<App />)
+// Подменяет глобальный fetch: ответы API задаются как «путь → [статус, тело]».
+// Запросы при этом идут через настоящий сгенерированный SDK.
+function stubApi(routes: Record<string, [number, unknown]>) {
+  const fetchMock = vi.fn(async (request: Request) => {
+    const { pathname } = new URL(request.url)
+    const [status, body] = routes[`${request.method} ${pathname}`] ?? [
+      404,
+      { code: 'NOT_FOUND', message: 'нет такого маршрута' },
+    ]
+    return Response.json(body, { status })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
 
-    expect(
-      screen.getByRole('heading', { name: 'Календарь звонков' }),
-    ).toBeInTheDocument()
+function renderApp(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  )
+}
 
-    await userEvent.click(screen.getByRole('link', { name: 'Забронировать звонок' }))
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
-    expect(
-      screen.getByRole('heading', { name: 'Запись на звонок' }),
-    ).toBeInTheDocument()
+describe('публичная страница Owner', () => {
+  it('показывает имя Owner из API', async () => {
+    const fetchMock = stubApi({
+      'GET /api/owner': [200, { name: 'Анна Смирнова', timezone: 'Europe/Moscow' }],
+    })
+
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'Анна Смирнова' })).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('сообщает об ошибке, если API не ответил данными Owner', async () => {
+    stubApi({
+      'GET /api/owner': [500, { code: 'INTERNAL_ERROR', message: 'Внутренняя ошибка сервера' }],
+    })
+
+    renderApp('/')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить страницу')
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 })

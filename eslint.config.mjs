@@ -8,7 +8,9 @@ import tseslint from 'typescript-eslint'
 
 // Единый flat config на всё монорепозиторий (ESLint 10, eslintrc-формат удалён).
 export default defineConfig(
-  globalIgnores(['**/dist', '**/node_modules']),
+  // generated — код из `npm run generate` (ADR 0004): руками не правится,
+  // поэтому правилам проекта следовать не обязан
+  globalIgnores(['**/dist', '**/node_modules', '**/generated']),
   {
     files: ['**/*.{js,mjs,ts,tsx}'],
     extends: [js.configs.recommended],

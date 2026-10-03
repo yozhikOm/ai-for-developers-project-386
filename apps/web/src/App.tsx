@@ -1,19 +1,18 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import BookingPage from './pages/BookingPage.tsx'
-import HomePage from './pages/HomePage.tsx'
+import PublicPage from './pages/PublicPage.tsx'
 // ПРОТОТИП, выбросить: тикет «Экраны и сценарии гостя и владельца»
 import ScreensPrototype from './prototype/screens/ScreensPrototype.tsx'
 
-// Корневой компонент: роутинг между главной страницей и страницей записи.
+// Корневой компонент: маршруты приложения. Роутер (BrowserRouter) подключает
+// main.tsx, чтобы тесты могли рендерить приложение в MemoryRouter на нужном URL.
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/booking" element={<BookingPage />} />
-        {import.meta.env.DEV && <Route path="/prototype/screens" element={<ScreensPrototype />} />}
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<PublicPage />} />
+      <Route path="/booking" element={<BookingPage />} />
+      {import.meta.env.DEV && <Route path="/prototype/screens" element={<ScreensPrototype />} />}
+    </Routes>
   )
 }
 

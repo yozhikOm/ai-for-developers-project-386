@@ -23,6 +23,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check generated code is up to date
+        # Сгенерированное из contract/ коммитится и руками не правится (ADR 0004):
+        # падаем, если оно разошлось с контрактом
+        run: npm run generate && git diff --exit-code
+
       - name: Lint
         run: npm run lint
 
