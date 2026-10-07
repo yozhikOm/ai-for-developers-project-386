@@ -20,7 +20,9 @@
   (без шага компиляции). `src/app.ts` — фабрика `buildApp()` (маршруты, статика),
   `src/index.ts` — точка входа (listen). Маршруты регистрирует `fastify-openapi-glue`
   по контракту; обработчик операции — в `src/handlers/`, ключ — её `operationId`
-  (тип `RouteHandlers` требует все). Ошибки — `ApiError` из `src/errors.ts`.
+  (тип `RouteHandlers` требует все). Ошибки — `ApiError` из `src/errors.ts`:
+  обработчик не отправляет отказ сам, а бросает `HttpError(статус, code, message)`
+  (сгенерированный тип ответа допускает только успешные статусы).
 - `apps/web` — frontend: React 19, TypeScript, Vite. В dev-режиме proxy `/api` →
   `localhost:3000`. Запросы к API — только через сгенерированный SDK
   (`@/api/generated`).

@@ -54,6 +54,24 @@ export type Health = {
 };
 
 /**
+ * Данные нового EventType; id и момент создания назначает сервер.
+ */
+export type NewEventType = {
+    /**
+     * Название; не уникально. Сервер обрезает пробелы по краям, название из одних пробелов — пустое.
+     */
+    name: string;
+    /**
+     * Необязательное описание; пустое после обрезки пробелов означает «нет описания».
+     */
+    description?: string;
+    /**
+     * Длительность звонка в минутах, кратная 15: кратность контракт выразить не может, её проверяет сервер.
+     */
+    durationMinutes: number;
+};
+
+/**
  * Owner — владелец календаря; задаётся конфигурацией сервера.
  */
 export type Owner = {
@@ -91,6 +109,31 @@ export type ListEventTypesResponses = {
 };
 
 export type ListEventTypesResponse = ListEventTypesResponses[keyof ListEventTypesResponses];
+
+export type CreateEventTypeData = {
+    body: NewEventType;
+    path?: never;
+    query?: never;
+    url: '/api/event-types';
+};
+
+export type CreateEventTypeErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type CreateEventTypeError = CreateEventTypeErrors[keyof CreateEventTypeErrors];
+
+export type CreateEventTypeResponses = {
+    /**
+     * The request has succeeded and a new resource has been created as a result.
+     */
+    201: EventType;
+};
+
+export type CreateEventTypeResponse = CreateEventTypeResponses[keyof CreateEventTypeResponses];
 
 export type GetHealthData = {
     body?: never;

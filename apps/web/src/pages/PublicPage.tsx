@@ -30,38 +30,49 @@ function PublicPage() {
   }, [])
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md">
-        {state.status === 'loading' && (
-          <CardHeader className="text-center">
-            <p role="status" className="text-muted-foreground">Загрузка…</p>
-          </CardHeader>
-        )}
-        {state.status === 'error' && (
-          <CardHeader className="text-center">
-            <p role="alert" className="text-destructive">
-              Не удалось загрузить страницу. Попробуйте обновить её.
-            </p>
-          </CardHeader>
-        )}
-        {state.status === 'ready' && (
-          <>
+    <div className="flex min-h-screen flex-col">
+      <main className="flex flex-1 items-center justify-center px-4 py-8">
+        <Card className="w-full max-w-md">
+          {state.status === 'loading' && (
             <CardHeader className="text-center">
-              <CardDescription>Запись на звонок</CardDescription>
-              <h1 className="font-heading text-2xl leading-snug font-semibold">
-                {state.owner.name}
-              </h1>
-              <CardDescription className="text-base">
-                Выберите формат звонка, затем удобное время
-              </CardDescription>
+              <p role="status" className="text-muted-foreground">Загрузка…</p>
             </CardHeader>
-            <CardContent>
-              <EventTypeList eventTypes={state.eventTypes} />
-            </CardContent>
-          </>
-        )}
-      </Card>
-    </main>
+          )}
+          {state.status === 'error' && (
+            <CardHeader className="text-center">
+              <p role="alert" className="text-destructive">
+                Не удалось загрузить страницу. Попробуйте обновить её.
+              </p>
+            </CardHeader>
+          )}
+          {state.status === 'ready' && (
+            <>
+              <CardHeader className="text-center">
+                <CardDescription>Запись на звонок</CardDescription>
+                <h1 className="font-heading text-2xl leading-snug font-semibold">
+                  {state.owner.name}
+                </h1>
+                <CardDescription className="text-base">
+                  Выберите формат звонка, затем удобное время
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EventTypeList eventTypes={state.eventTypes} />
+              </CardContent>
+            </>
+          )}
+        </Card>
+      </main>
+      {/* Неприметный вход в раздел Owner: аутентификации нет по условию задания */}
+      <footer className="pb-4 text-center">
+        <Link
+          to="/owner"
+          className="text-xs text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:underline"
+        >
+          Вход для владельца
+        </Link>
+      </footer>
+    </div>
   )
 }
 

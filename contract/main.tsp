@@ -70,6 +70,23 @@ model EventType {
   createdAt: utcDateTime;
 }
 
+/** Данные нового EventType; id и момент создания назначает сервер. */
+model NewEventType {
+  /** Название; не уникально. Сервер обрезает пробелы по краям, название из одних пробелов — пустое. */
+  @minLength(1)
+  @maxLength(100)
+  name: string;
+
+  /** Необязательное описание; пустое после обрезки пробелов означает «нет описания». */
+  @maxLength(500)
+  description?: string;
+
+  /** Длительность звонка в минутах, кратная 15: кратность контракт выразить не может, её проверяет сервер. */
+  @minValue(15)
+  @maxValue(540)
+  durationMinutes: int32;
+}
+
 /** Проверка живости: используется smoke-тестом и Docker HEALTHCHECK. */
 @route("/health")
 @get
@@ -87,3 +104,12 @@ op getOwner(): Owner | ApiError;
 @get
 @operationId("listEventTypes")
 op listEventTypes(): EventType[] | ApiError;
+
+/** Создаёт EventType и возвращает его с назначенным id (нужен для подсветки в списке Owner). */
+@route("/event-types")
+@post
+@operationId("createEventType")
+op createEventType(@body body: NewEventType): {
+  @statusCode statusCode: 201;
+  @body body: EventType;
+} | ApiError;
