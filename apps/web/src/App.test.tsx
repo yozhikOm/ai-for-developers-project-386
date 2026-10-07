@@ -1,35 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import App from './App.tsx'
-
-type StubResponse = [number, unknown]
-
-// Подменяет глобальный fetch: ответы API задаются как «метод путь → [статус, тело]»
-// или функцией от запроса (когда ответ зависит от тела или предыдущих запросов).
-// Запросы при этом идут через настоящий сгенерированный SDK.
-function stubApi(routes: Record<string, StubResponse | ((request: Request) => Promise<StubResponse>)>) {
-  const fetchMock = vi.fn(async (request: Request) => {
-    const { pathname } = new URL(request.url)
-    const route = routes[`${request.method} ${pathname}`]
-    const [status, body] =
-      typeof route === 'function'
-        ? await route(request)
-        : (route ?? [404, { code: 'NOT_FOUND', message: 'нет такого маршрута' }])
-    return Response.json(body, { status })
-  })
-  vi.stubGlobal('fetch', fetchMock)
-  return fetchMock
-}
-
-function renderApp(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
-  )
-}
+import { renderApp, stubApi } from './testing.tsx'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -101,18 +73,22 @@ describe('публичная страница Owner', () => {
   })
 
   it('по клику на EventType ведёт к выбору времени этого типа', async () => {
+    const { id } = eventTypeWithoutDescription
     stubApi({
       'GET /api/owner': [200, owner],
       'GET /api/event-types': [200, [eventTypeWithDescription, eventTypeWithoutDescription]],
+      [`GET /api/event-types/${id}`]: [200, eventTypeWithoutDescription],
+      [`GET /api/event-types/${id}/slots`]: [200, []],
     })
     renderApp('/')
 
     const link = await screen.findByRole('link', { name: /Разбор проекта/ })
-    expect(link).toHaveAttribute('href', `/booking/${eventTypeWithoutDescription.id}`)
+    expect(link).toHaveAttribute('href', `/booking/${id}`)
 
     await userEvent.click(link)
 
-    expect(await screen.findByRole('heading', { name: 'Запись на звонок' })).toBeInTheDocument()
+    const info = await screen.findByRole('region', { name: 'Информация' })
+    expect(info).toHaveTextContent('Разбор проекта')
   })
 
   it.each([

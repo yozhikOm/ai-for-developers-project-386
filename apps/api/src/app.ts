@@ -11,6 +11,7 @@ import type { RouteHandlers } from './generated/fastify.gen.ts';
 import { eventTypeHandlers } from './handlers/eventTypes.ts';
 import { healthHandlers } from './handlers/health.ts';
 import { ownerHandlers } from './handlers/owner.ts';
+import { slotHandlers } from './handlers/slots.ts';
 import { seedEventTypes } from './seed.ts';
 
 // Каталог собранного frontend (apps/web/dist).
@@ -55,11 +56,14 @@ export async function buildApp({
 
   await registerApiErrors(app);
 
+  const owner = readOwner();
+
   // Обработчики операций контракта; тип RouteHandlers требует реализовать каждую
   const serviceHandlers: RouteHandlers = {
     ...healthHandlers(),
-    ...ownerHandlers(readOwner()),
+    ...ownerHandlers(owner),
     ...eventTypeHandlers(eventTypes, now),
+    ...slotHandlers(eventTypes, owner, now),
   };
 
   // Маршруты и проверку запросов регистрирует glue по спеке;

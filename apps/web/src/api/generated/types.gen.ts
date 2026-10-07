@@ -18,7 +18,26 @@ export type ApiError = {
 /**
  * Машиночитаемая причина ошибки: клиент различает отказы по ней, а не по тексту.
  */
-export type ApiErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'INTERNAL_ERROR';
+export type ApiErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'EVENT_TYPE_NOT_FOUND' | 'INTERNAL_ERROR';
+
+/**
+ * День BookingWindow со слотами выбранного EventType.
+ */
+export type BookingWindowDay = {
+    /**
+     * Календарная дата по поясу Owner.
+     */
+    date: string;
+    /**
+     * Рабочий ли день; у нерабочего (выходного) слотов нет.
+     */
+    isWorkingDay: boolean;
+    /**
+     * Слоты дня по возрастанию начала. Прошедших и попавших в MinimumNotice нет вовсе,
+     * поэтому у рабочего дня список может быть пустым.
+     */
+    slots: Array<Slot>;
+};
 
 /**
  * EventType — вид звонка, который публикует Owner; Guest бронирует время в его рамках.
@@ -85,6 +104,26 @@ export type Owner = {
     timezone: string;
 };
 
+/**
+ * Slot — интервал `[начало, конец)` длиной в длительность EventType; вычисляется, не хранится.
+ */
+export type Slot = {
+    /**
+     * Начало (UTC).
+     */
+    start: string;
+    /**
+     * Конец (UTC): начало плюс длительность EventType.
+     */
+    end: string;
+    status: SlotStatus;
+};
+
+/**
+ * Статус Slot: «свободен» или «занят» пересечением с Booking с учётом Buffer.
+ */
+export type SlotStatus = 'free' | 'taken';
+
 export type ListEventTypesData = {
     body?: never;
     path?: never;
@@ -134,6 +173,60 @@ export type CreateEventTypeResponses = {
 };
 
 export type CreateEventTypeResponse = CreateEventTypeResponses[keyof CreateEventTypeResponses];
+
+export type GetEventTypeData = {
+    body?: never;
+    path: {
+        eventTypeId: string;
+    };
+    query?: never;
+    url: '/api/event-types/{eventTypeId}';
+};
+
+export type GetEventTypeErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type GetEventTypeError = GetEventTypeErrors[keyof GetEventTypeErrors];
+
+export type GetEventTypeResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: EventType;
+};
+
+export type GetEventTypeResponse = GetEventTypeResponses[keyof GetEventTypeResponses];
+
+export type ListSlotsData = {
+    body?: never;
+    path: {
+        eventTypeId: string;
+    };
+    query?: never;
+    url: '/api/event-types/{eventTypeId}/slots';
+};
+
+export type ListSlotsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type ListSlotsError = ListSlotsErrors[keyof ListSlotsErrors];
+
+export type ListSlotsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: Array<BookingWindowDay>;
+};
+
+export type ListSlotsResponse = ListSlotsResponses[keyof ListSlotsResponses];
 
 export type GetHealthData = {
     body?: never;
