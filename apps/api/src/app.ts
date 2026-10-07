@@ -27,12 +27,18 @@ export type BuildAppOptions = {
   databasePath?: string;
   // Засеять стартовые EventType, если БД создана только что. Включает точка входа
   seedNewDatabase?: boolean;
+  // Часы приложения; тесты подставляют свои, чтобы не зависеть от реального времени
+  now?: () => Date;
 };
 
 // Фабрика приложения: собирает Fastify-инстанс со всеми маршрутами.
 // Отделена от index.ts, чтобы тесты могли вызывать app.inject()
 // без поднятия реального HTTP-порта.
-export async function buildApp({ databasePath = ':memory:', seedNewDatabase = false }: BuildAppOptions = {}) {
+export async function buildApp({
+  databasePath = ':memory:',
+  seedNewDatabase = false,
+  now = () => new Date(),
+}: BuildAppOptions = {}) {
   // Под тестами (Vitest выставляет NODE_ENV=test) логгер отключаем,
   // чтобы не засорять вывод; в остальных режимах — JSON-логи Pino
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -44,7 +50,7 @@ export async function buildApp({ databasePath = ':memory:', seedNewDatabase = fa
 
   const eventTypes = createEventTypeStore(db);
   if (seedNewDatabase && isNew) {
-    seedEventTypes(eventTypes, new Date());
+    seedEventTypes(eventTypes, now());
   }
 
   await registerApiErrors(app);
@@ -53,7 +59,7 @@ export async function buildApp({ databasePath = ':memory:', seedNewDatabase = fa
   const serviceHandlers: RouteHandlers = {
     ...healthHandlers(),
     ...ownerHandlers(readOwner()),
-    ...eventTypeHandlers(eventTypes),
+    ...eventTypeHandlers(eventTypes, now),
   };
 
   // Маршруты и проверку запросов регистрирует glue по спеке;

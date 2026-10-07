@@ -5,6 +5,21 @@ export function apiError(code: ApiErrorCode, message: string): ApiError {
   return { code, message };
 }
 
+// Отказ, который обработчик операции бросает вместо ответа: общий обработчик
+// ошибок отправит его как ApiError с этим статусом. Сгенерированный тип ответа
+// обработчика описывает только успешные статусы, поэтому отказы идут через throw.
+export class HttpError extends Error {
+  readonly statusCode: number;
+  readonly code: ApiErrorCode;
+
+  constructor(statusCode: number, code: ApiErrorCode, message: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
+
 // Относится ли URL (возможно, с query-строкой) к API: /api или /api/...
 export function isApiUrl(url: string): boolean {
   const pathname = url.split('?', 1)[0];
@@ -19,12 +34,17 @@ export function replyApiNotFound(request: FastifyRequest, reply: FastifyReply) {
 // Приводит ответы API к единой модели ApiError { code, message } из контракта.
 // Регистрировать до маршрутов glue: дочерние контексты наследуют обработчики.
 export async function registerApiErrors(app: FastifyInstance) {
-  app.setErrorHandler((error: FastifyError, request, reply) => {
+  app.setErrorHandler((error: FastifyError | HttpError, request, reply) => {
+    // Отказ из обработчика операции: код и статус задал он сам
+    if (error instanceof HttpError) {
+      reply.code(error.statusCode).send(apiError(error.code, error.message));
+      return;
+    }
+
     const statusCode = error.statusCode ?? 500;
 
     // Запрос не прошёл проверку: ошибки валидации Fastify (error.validation), битый JSON,
     // неподдерживаемый Content-Type и т. п. Статус сохраняем, текст — от Fastify.
-    // Бизнес-отказы (EVENT_TYPE_NOT_FOUND и др.) обработчики отправляют сами.
     if (error.validation || (statusCode >= 400 && statusCode < 500)) {
       reply.code(error.validation ? 400 : statusCode).send(apiError('VALIDATION_ERROR', error.message));
       return;

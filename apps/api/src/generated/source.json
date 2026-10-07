@@ -36,6 +36,43 @@
             }
           }
         }
+      },
+      "post": {
+        "operationId": "createEventType",
+        "description": "Создаёт EventType и возвращает его с назначенным id (нужен для подсветки в списке Owner).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewEventType"
+              }
+            }
+          }
+        }
       }
     },
     "/api/health": {
@@ -174,6 +211,34 @@
           }
         },
         "description": "Ответ проверки живости."
+      },
+      "NewEventType": {
+        "type": "object",
+        "required": [
+          "name",
+          "durationMinutes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Название; не уникально. Сервер обрезает пробелы по краям, название из одних пробелов — пустое."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Необязательное описание; пустое после обрезки пробелов означает «нет описания»."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 15,
+            "maximum": 540,
+            "description": "Длительность звонка в минутах, кратная 15: кратность контракт выразить не может, её проверяет сервер."
+          }
+        },
+        "description": "Данные нового EventType; id и момент создания назначает сервер."
       },
       "Owner": {
         "type": "object",

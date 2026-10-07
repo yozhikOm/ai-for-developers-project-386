@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses } from './types.gen.ts';
+import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -22,6 +22,18 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * Все EventType по возрастанию времени создания.
  */
 export const listEventTypes = <ThrowOnError extends boolean = false>(options?: Options<ListEventTypesData, ThrowOnError>): RequestResult<ListEventTypesResponses, ListEventTypesErrors, ThrowOnError> => (options?.client ?? client).get<ListEventTypesResponses, ListEventTypesErrors, ThrowOnError>({ url: '/api/event-types', ...options });
+
+/**
+ * Создаёт EventType и возвращает его с назначенным id (нужен для подсветки в списке Owner).
+ */
+export const createEventType = <ThrowOnError extends boolean = false>(options: Options<CreateEventTypeData, ThrowOnError>): RequestResult<CreateEventTypeResponses, CreateEventTypeErrors, ThrowOnError> => (options.client ?? client).post<CreateEventTypeResponses, CreateEventTypeErrors, ThrowOnError>({
+    url: '/api/event-types',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Проверка живости: используется smoke-тестом и Docker HEALTHCHECK.

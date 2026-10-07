@@ -4,15 +4,19 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.tsx'
 
-// Подменяет глобальный fetch: ответы API задаются как «путь → [статус, тело]».
+type StubResponse = [number, unknown]
+
+// Подменяет глобальный fetch: ответы API задаются как «метод путь → [статус, тело]»
+// или функцией от запроса (когда ответ зависит от тела или предыдущих запросов).
 // Запросы при этом идут через настоящий сгенерированный SDK.
-function stubApi(routes: Record<string, [number, unknown]>) {
+function stubApi(routes: Record<string, StubResponse | ((request: Request) => Promise<StubResponse>)>) {
   const fetchMock = vi.fn(async (request: Request) => {
     const { pathname } = new URL(request.url)
-    const [status, body] = routes[`${request.method} ${pathname}`] ?? [
-      404,
-      { code: 'NOT_FOUND', message: 'нет такого маршрута' },
-    ]
+    const route = routes[`${request.method} ${pathname}`]
+    const [status, body] =
+      typeof route === 'function'
+        ? await route(request)
+        : (route ?? [404, { code: 'NOT_FOUND', message: 'нет такого маршрута' }])
     return Response.json(body, { status })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -125,5 +129,188 @@ describe('публичная страница Owner', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить страницу')
     expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+  })
+})
+
+// Fake API с состоянием: тип, созданный POST-запросом, появляется в GET-списке
+function stubApiWithEventTypes(initial: unknown[]) {
+  const eventTypes = [...initial]
+  const createdBodies: unknown[] = []
+  const fetchMock = stubApi({
+    'GET /api/owner': [200, owner],
+    'GET /api/event-types': async () => [200, eventTypes],
+    'POST /api/event-types': async (request) => {
+      const body = await request.json()
+      createdBodies.push(body)
+      const eventType = {
+        id: '33333333-3333-4333-8333-333333333333',
+        ...body,
+        createdAt: '2026-10-03T09:00:00.000Z',
+      }
+      eventTypes.push(eventType)
+      return [201, eventType]
+    },
+  })
+  return { fetchMock, createdBodies }
+}
+
+function postRequests(fetchMock: ReturnType<typeof stubApi>) {
+  return fetchMock.mock.calls.filter(([request]) => request.method === 'POST')
+}
+
+async function openNewEventTypeScreen() {
+  await userEvent.click(await screen.findByRole('link', { name: '+ Создать тип события' }))
+  return screen.findByRole('heading', { name: 'Новый тип события' })
+}
+
+describe('раздел Owner: типы событий', () => {
+  it('ссылка «Вход для владельца» на публичной странице ведёт в раздел Owner', async () => {
+    stubApiWithEventTypes([eventTypeWithDescription])
+    renderApp('/')
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Вход для владельца' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Кабинет владельца' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Типы событий (1)' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('показывает счётчик во вкладке и таблицу: название, описание или «—», длительность', async () => {
+    stubApiWithEventTypes([eventTypeWithDescription, eventTypeWithoutDescription])
+
+    renderApp('/owner')
+
+    expect(await screen.findByRole('link', { name: 'Типы событий (2)' })).toBeInTheDocument()
+    const [, ...rows] = screen.getAllByRole('row')
+    expect(rows).toHaveLength(2)
+    expect(within(rows[0]).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+      'Знакомство',
+      'Короткий созвон, чтобы понять задачу',
+      '15 мин',
+    ])
+    expect(within(rows[1]).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+      'Разбор проекта',
+      '—',
+      '60 мин',
+    ])
+  })
+
+  it('без EventType предупреждает, что гостям нечего бронировать', async () => {
+    stubApiWithEventTypes([])
+
+    renderApp('/owner/event-types')
+
+    expect(await screen.findByText(/гости не смогут записаться/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Типы событий (0)' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('«+ Создать тип события» открывает отдельный экран, «Создать» возвращает к списку с подсвеченным новым типом', async () => {
+    const { createdBodies } = stubApiWithEventTypes([eventTypeWithDescription])
+    renderApp('/owner/event-types')
+
+    await openNewEventTypeScreen()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Название'), '  Консультация  ')
+    await userEvent.type(screen.getByLabelText(/Описание/), '   ')
+    const duration = screen.getByLabelText(/Длительность/)
+    await userEvent.clear(duration)
+    await userEvent.type(duration, '45')
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    expect(await screen.findByRole('link', { name: 'Типы событий (2)' })).toBeInTheDocument()
+    // На сервер уходят обрезанные значения, пустое описание не отправляется
+    expect(createdBodies).toEqual([{ name: 'Консультация', durationMinutes: 45 }])
+    const [, first, created] = screen.getAllByRole('row')
+    expect(within(created).getByText('Новый')).toBeInTheDocument()
+    expect(created).toHaveTextContent('Консультация')
+    expect(within(first).queryByText('Новый')).not.toBeInTheDocument()
+  })
+
+  it('созданный тип виден на публичной странице', async () => {
+    stubApiWithEventTypes([])
+    renderApp('/owner/event-types/new')
+
+    await userEvent.type(await screen.findByLabelText('Название'), 'Консультация')
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+    await screen.findByRole('link', { name: 'Типы событий (1)' })
+    await userEvent.click(screen.getByRole('link', { name: 'Публичная страница' }))
+
+    expect(await screen.findByRole('link', { name: /Консультация/ })).toBeInTheDocument()
+  })
+
+  it('«Отмена» возвращает к списку без изменений', async () => {
+    const { fetchMock } = stubApiWithEventTypes([eventTypeWithDescription])
+    renderApp('/owner/event-types')
+    await openNewEventTypeScreen()
+
+    await userEvent.type(screen.getByLabelText('Название'), 'Черновик')
+    await userEvent.click(screen.getByRole('link', { name: 'Отмена' }))
+
+    expect(await screen.findByRole('link', { name: 'Типы событий (1)' })).toBeInTheDocument()
+    expect(screen.getAllByRole('row')).toHaveLength(2)
+    expect(screen.queryByText('Новый')).not.toBeInTheDocument()
+    expect(postRequests(fetchMock)).toEqual([])
+  })
+
+  it.each<[string, { name?: string; description?: string; duration?: string }, string | RegExp, string]>([
+    ['пустое название', { name: '' }, 'Название', 'Укажите название'],
+    ['название из одних пробелов', { name: '   ' }, 'Название', 'Укажите название'],
+    ['название длиннее 100', { name: 'н'.repeat(101) }, 'Название', 'Не длиннее 100 символов'],
+    ['описание длиннее 500', { description: 'о'.repeat(501) }, /Описание/, 'Не длиннее 500 символов'],
+    ['пустая длительность', { duration: '' }, /Длительность/, 'Укажите длительность'],
+    ['длительность 0', { duration: '0' }, /Длительность/, 'От 15 до 540 минут, кратно 15'],
+    ['длительность 555', { duration: '555' }, /Длительность/, 'От 15 до 540 минут, кратно 15'],
+    ['длительность 600', { duration: '600' }, /Длительность/, 'От 15 до 540 минут, кратно 15'],
+  ])('показывает ошибку под полем и не отправляет форму: %s', async (_title, values, field, message) => {
+    const { fetchMock } = stubApiWithEventTypes([])
+    renderApp('/owner/event-types/new')
+    const { name = 'Звонок', description = '', duration = '30' } = values
+
+    await screen.findByRole('heading', { name: 'Новый тип события' })
+    // Текст вставляем целиком, а не печатаем посимвольно: длинные значения так быстрее
+    if (name) {
+      await userEvent.click(screen.getByLabelText('Название'))
+      await userEvent.paste(name)
+    }
+    if (description) {
+      await userEvent.click(screen.getByLabelText(/Описание/))
+      await userEvent.paste(description)
+    }
+    const durationInput = screen.getByLabelText(/Длительность/)
+    await userEvent.clear(durationInput)
+    if (duration) await userEvent.type(durationInput, duration)
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    expect(screen.getByLabelText(field)).toHaveAccessibleDescription(message)
+    expect(screen.getByLabelText(field)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('heading', { name: 'Новый тип события' })).toBeInTheDocument()
+    expect(postRequests(fetchMock)).toEqual([])
+  })
+
+  it('ошибка исчезает, когда поле исправлено', async () => {
+    stubApiWithEventTypes([])
+    renderApp('/owner/event-types/new')
+    await userEvent.click(await screen.findByRole('button', { name: 'Создать' }))
+    const name = screen.getByLabelText('Название')
+    expect(name).toHaveAccessibleDescription('Укажите название')
+
+    await userEvent.type(name, 'Звонок')
+
+    expect(name).not.toHaveAccessibleDescription()
+    expect(name).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('отказ сервера показывает общее сообщение формы', async () => {
+    stubApi({
+      'POST /api/event-types': [400, { code: 'VALIDATION_ERROR', message: 'Длительность должна быть кратна 15 минутам' }],
+    })
+    renderApp('/owner/event-types/new')
+
+    await userEvent.type(await screen.findByLabelText('Название'), 'Звонок')
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось создать тип события')
+    expect(screen.getByRole('heading', { name: 'Новый тип события' })).toBeInTheDocument()
   })
 })
