@@ -10,7 +10,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<PublicPage />} />
-      <Route path="/booking" element={<BookingPage />} />
+      <Route path="/booking/:eventTypeId" element={<BookingPage />} />
       {import.meta.env.DEV && <Route path="/prototype/screens" element={<ScreensPrototype />} />}
     </Routes>
   )
