@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses } from './types.gen.ts';
+import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetEventTypeData, GetEventTypeErrors, GetEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses, ListSlotsData, ListSlotsErrors, ListSlotsResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -34,6 +34,17 @@ export const createEventType = <ThrowOnError extends boolean = false>(options: O
         ...options.headers
     }
 });
+
+/**
+ * Один EventType: для прямой ссылки на выбор времени и перезагрузки страницы.
+ */
+export const getEventType = <ThrowOnError extends boolean = false>(options: Options<GetEventTypeData, ThrowOnError>): RequestResult<GetEventTypeResponses, GetEventTypeErrors, ThrowOnError> => (options.client ?? client).get<GetEventTypeResponses, GetEventTypeErrors, ThrowOnError>({ url: '/api/event-types/{eventTypeId}', ...options });
+
+/**
+ * Всё BookingWindow одним ответом: 14 дней начиная с сегодняшнего по поясу Owner
+ * со слотами EventType. Окно, «сегодня», выходные и MinimumNotice определяет сервер.
+ */
+export const listSlots = <ThrowOnError extends boolean = false>(options: Options<ListSlotsData, ThrowOnError>): RequestResult<ListSlotsResponses, ListSlotsErrors, ThrowOnError> => (options.client ?? client).get<ListSlotsResponses, ListSlotsErrors, ThrowOnError>({ url: '/api/event-types/{eventTypeId}/slots', ...options });
 
 /**
  * Проверка живости: используется smoke-тестом и Docker HEALTHCHECK.

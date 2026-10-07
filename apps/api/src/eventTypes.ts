@@ -24,6 +24,9 @@ export function createEventTypeStore(db: DatabaseSync) {
   const selectAll = db.prepare(
     'SELECT id, name, description, duration_minutes, created_at FROM event_types ORDER BY created_at, rowid',
   );
+  const selectById = db.prepare(
+    'SELECT id, name, description, duration_minutes, created_at FROM event_types WHERE id = ?',
+  );
   const insert = db.prepare(
     'INSERT INTO event_types (id, name, description, duration_minutes, created_at) VALUES (?, ?, ?, ?, ?)',
   );
@@ -32,6 +35,12 @@ export function createEventTypeStore(db: DatabaseSync) {
     // Все EventType по возрастанию времени создания
     list(): EventType[] {
       return (selectAll.all() as EventTypeRow[]).map(toEventType);
+    },
+
+    // EventType по id; undefined, если такого нет
+    get(id: string): EventType | undefined {
+      const row = selectById.get(id) as EventTypeRow | undefined;
+      return row && toEventType(row);
     },
 
     create(input: NewEventType, createdAt: Date): EventType {

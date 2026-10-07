@@ -47,6 +47,56 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NewEventType'
+  /api/event-types/{eventTypeId}:
+    get:
+      operationId: getEventType
+      description: 'Один EventType: для прямой ссылки на выбор времени и перезагрузки страницы.'
+      parameters:
+        - name: eventTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventType'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/event-types/{eventTypeId}/slots:
+    get:
+      operationId: listSlots
+      description: |-
+        Всё BookingWindow одним ответом: 14 дней начиная с сегодняшнего по поясу Owner
+        со слотами EventType. Окно, «сегодня», выходные и MinimumNotice определяет сервер.
+      parameters:
+        - name: eventTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingWindowDay'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/health:
     get:
       operationId: getHealth
@@ -102,8 +152,31 @@ components:
       enum:
         - VALIDATION_ERROR
         - NOT_FOUND
+        - EVENT_TYPE_NOT_FOUND
         - INTERNAL_ERROR
       description: 'Машиночитаемая причина ошибки: клиент различает отказы по ней, а не по тексту.'
+    BookingWindowDay:
+      type: object
+      required:
+        - date
+        - isWorkingDay
+        - slots
+      properties:
+        date:
+          type: string
+          format: date
+          description: Календарная дата по поясу Owner.
+        isWorkingDay:
+          type: boolean
+          description: Рабочий ли день; у нерабочего (выходного) слотов нет.
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Slot'
+          description: |-
+            Слоты дня по возрастанию начала. Прошедших и попавших в MinimumNotice нет вовсе,
+            поэтому у рабочего дня список может быть пустым.
+      description: День BookingWindow со слотами выбранного EventType.
     EventType:
       type: object
       required:
@@ -176,3 +249,27 @@ components:
           type: string
           description: 'IANA-пояс Owner (например, `Europe/Moscow`): в нём считается и показывается время.'
       description: Owner — владелец календаря; задаётся конфигурацией сервера.
+    Slot:
+      type: object
+      required:
+        - start
+        - end
+        - status
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: Начало (UTC).
+        end:
+          type: string
+          format: date-time
+          description: 'Конец (UTC): начало плюс длительность EventType.'
+        status:
+          $ref: '#/components/schemas/SlotStatus'
+      description: Slot — интервал `[начало, конец)` длиной в длительность EventType; вычисляется, не хранится.
+    SlotStatus:
+      type: string
+      enum:
+        - free
+        - taken
+      description: 'Статус Slot: «свободен» или «занят» пересечением с Booking с учётом Buffer.'

@@ -21,6 +21,9 @@ export default defineConfig({
     name: 'web',
     // Секция для Vitest: React-компоненты тестируем в jsdom
     environment: 'jsdom',
+    // Пояс «браузера» в тестах намеренно не совпадает с поясом Owner (Москва) и лежит
+    // западнее UTC: время и даты на экране должны считаться в поясе Owner
+    env: { TZ: 'Pacific/Honolulu' },
     setupFiles: ['./src/setupTests.ts'],
   },
 })

@@ -24,6 +24,9 @@ union ApiErrorCode {
   /** Неизвестный маршрут под /api. */
   "NOT_FOUND",
 
+  /** EventType с таким id не существует. */
+  "EVENT_TYPE_NOT_FOUND",
+
   /** Непредвиденная ошибка сервера. */
   "INTERNAL_ERROR",
 }
@@ -87,6 +90,38 @@ model NewEventType {
   durationMinutes: int32;
 }
 
+/** Статус Slot: «свободен» или «занят» пересечением с Booking с учётом Buffer. */
+union SlotStatus {
+  "free",
+  "taken",
+}
+
+/** Slot — интервал `[начало, конец)` длиной в длительность EventType; вычисляется, не хранится. */
+model Slot {
+  /** Начало (UTC). */
+  start: utcDateTime;
+
+  /** Конец (UTC): начало плюс длительность EventType. */
+  end: utcDateTime;
+
+  status: SlotStatus;
+}
+
+/** День BookingWindow со слотами выбранного EventType. */
+model BookingWindowDay {
+  /** Календарная дата по поясу Owner. */
+  date: plainDate;
+
+  /** Рабочий ли день; у нерабочего (выходного) слотов нет. */
+  isWorkingDay: boolean;
+
+  /**
+   * Слоты дня по возрастанию начала. Прошедших и попавших в MinimumNotice нет вовсе,
+   * поэтому у рабочего дня список может быть пустым.
+   */
+  slots: Slot[];
+}
+
 /** Проверка живости: используется smoke-тестом и Docker HEALTHCHECK. */
 @route("/health")
 @get
@@ -113,3 +148,18 @@ op createEventType(@body body: NewEventType): {
   @statusCode statusCode: 201;
   @body body: EventType;
 } | ApiError;
+
+/** Один EventType: для прямой ссылки на выбор времени и перезагрузки страницы. */
+@route("/event-types/{eventTypeId}")
+@get
+@operationId("getEventType")
+op getEventType(@path eventTypeId: string): EventType | ApiError;
+
+/**
+ * Всё BookingWindow одним ответом: 14 дней начиная с сегодняшнего по поясу Owner
+ * со слотами EventType. Окно, «сегодня», выходные и MinimumNotice определяет сервер.
+ */
+@route("/event-types/{eventTypeId}/slots")
+@get
+@operationId("listSlots")
+op listSlots(@path eventTypeId: string): BookingWindowDay[] | ApiError;
