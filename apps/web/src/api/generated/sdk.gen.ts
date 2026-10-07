@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses } from './types.gen.ts';
+import type { GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,11 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Все EventType по возрастанию времени создания.
+ */
+export const listEventTypes = <ThrowOnError extends boolean = false>(options?: Options<ListEventTypesData, ThrowOnError>): RequestResult<ListEventTypesResponses, ListEventTypesErrors, ThrowOnError> => (options?.client ?? client).get<ListEventTypesResponses, ListEventTypesErrors, ThrowOnError>({ url: '/api/event-types', ...options });
 
 /**
  * Проверка живости: используется smoke-тестом и Docker HEALTHCHECK.

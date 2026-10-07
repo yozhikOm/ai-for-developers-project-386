@@ -1,6 +1,7 @@
 import { Card, CardDescription, CardHeader } from '@/components/ui/card'
 
-// Заглушка страницы записи: полноценное бронирование звонка — отдельный тикет.
+// Заглушка экрана выбора времени для EventType (/booking/:eventTypeId):
+// календарь BookingWindow — отдельный тикет.
 function BookingPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">

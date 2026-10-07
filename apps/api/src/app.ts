@@ -4,10 +4,14 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import fastifyOpenapiGlue from 'fastify-openapi-glue';
 import { readOwner } from './config.ts';
+import { openDatabase } from './db.ts';
 import { isApiUrl, registerApiErrors, replyApiNotFound } from './errors.ts';
+import { createEventTypeStore } from './eventTypes.ts';
 import type { RouteHandlers } from './generated/fastify.gen.ts';
+import { eventTypeHandlers } from './handlers/eventTypes.ts';
 import { healthHandlers } from './handlers/health.ts';
 import { ownerHandlers } from './handlers/owner.ts';
+import { seedEventTypes } from './seed.ts';
 
 // Каталог собранного frontend (apps/web/dist).
 // В dev-режиме его может не быть: тогда backend обслуживает только API,
@@ -18,13 +22,30 @@ const webDistDir = path.resolve(import.meta.dirname, '../../web/dist');
 // Лежит внутри apps/api, поэтому ни пакет, ни Docker-образ не читают файлов вне него.
 const specificationPath = path.resolve(import.meta.dirname, './generated/source.json');
 
+export type BuildAppOptions = {
+  // Путь к файлу SQLite; по умолчанию у каждого инстанса своя БД в памяти
+  databasePath?: string;
+  // Засеять стартовые EventType, если БД создана только что. Включает точка входа
+  seedNewDatabase?: boolean;
+};
+
 // Фабрика приложения: собирает Fastify-инстанс со всеми маршрутами.
 // Отделена от index.ts, чтобы тесты могли вызывать app.inject()
 // без поднятия реального HTTP-порта.
-export async function buildApp() {
+export async function buildApp({ databasePath = ':memory:', seedNewDatabase = false }: BuildAppOptions = {}) {
   // Под тестами (Vitest выставляет NODE_ENV=test) логгер отключаем,
   // чтобы не засорять вывод; в остальных режимах — JSON-логи Pino
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
+
+  const { db, isNew } = openDatabase(databasePath);
+  app.addHook('onClose', async () => {
+    db.close();
+  });
+
+  const eventTypes = createEventTypeStore(db);
+  if (seedNewDatabase && isNew) {
+    seedEventTypes(eventTypes, new Date());
+  }
 
   await registerApiErrors(app);
 
@@ -32,6 +53,7 @@ export async function buildApp() {
   const serviceHandlers: RouteHandlers = {
     ...healthHandlers(),
     ...ownerHandlers(readOwner()),
+    ...eventTypeHandlers(eventTypes),
   };
 
   // Маршруты и проверку запросов регистрирует glue по спеке;

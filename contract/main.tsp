@@ -51,6 +51,25 @@ model Owner {
   timezone: string;
 }
 
+/** EventType — вид звонка, который публикует Owner; Guest бронирует время в его рамках. */
+model EventType {
+  /** Системный id (UUID): его назначает сервер. */
+  @format("uuid")
+  id: string;
+
+  /** Название; не уникально. */
+  name: string;
+
+  /** Необязательное описание; без описания поле отсутствует. */
+  description?: string;
+
+  /** Длительность звонка в минутах. */
+  durationMinutes: int32;
+
+  /** Момент создания: по нему упорядочен список типов. */
+  createdAt: utcDateTime;
+}
+
 /** Проверка живости: используется smoke-тестом и Docker HEALTHCHECK. */
 @route("/health")
 @get
@@ -62,3 +81,9 @@ op getHealth(): Health | ApiError;
 @get
 @operationId("getOwner")
 op getOwner(): Owner | ApiError;
+
+/** Все EventType по возрастанию времени создания. */
+@route("/event-types")
+@get
+@operationId("listEventTypes")
+op listEventTypes(): EventType[] | ApiError;

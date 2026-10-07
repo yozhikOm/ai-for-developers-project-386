@@ -31,6 +31,11 @@ COPY --from=build /app/node_modules ./node_modules
 COPY apps/api ./apps/api
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 
+# Каталог SQLite (ADR 0005). Владелец — node, чтобы процесс мог писать в него;
+# новый именованный volume, смонтированный сюда, наследует владельца
+ENV DATABASE_PATH=/app/data/calendar.db
+RUN mkdir -p /app/data && chown node:node /app/data
+
 # Непривилегированный пользователь из базового образа
 USER node
 

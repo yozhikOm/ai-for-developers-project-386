@@ -21,6 +21,32 @@ export type ApiError = {
 export type ApiErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'INTERNAL_ERROR';
 
 /**
+ * EventType — вид звонка, который публикует Owner; Guest бронирует время в его рамках.
+ */
+export type EventType = {
+    /**
+     * Системный id (UUID): его назначает сервер.
+     */
+    id: string;
+    /**
+     * Название; не уникально.
+     */
+    name: string;
+    /**
+     * Необязательное описание; без описания поле отсутствует.
+     */
+    description?: string;
+    /**
+     * Длительность звонка в минутах.
+     */
+    durationMinutes: number;
+    /**
+     * Момент создания: по нему упорядочен список типов.
+     */
+    createdAt: string;
+};
+
+/**
  * Ответ проверки живости.
  */
 export type Health = {
@@ -40,6 +66,31 @@ export type Owner = {
      */
     timezone: string;
 };
+
+export type ListEventTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/event-types';
+};
+
+export type ListEventTypesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type ListEventTypesError = ListEventTypesErrors[keyof ListEventTypesErrors];
+
+export type ListEventTypesResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: Array<EventType>;
+};
+
+export type ListEventTypesResponse = ListEventTypesResponses[keyof ListEventTypesResponses];
 
 export type GetHealthData = {
     body?: never;

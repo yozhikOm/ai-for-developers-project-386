@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getOwner, type Owner } from '@/api/generated'
-import { buttonVariants } from '@/components/ui/button'
+import { getOwner, listEventTypes, type EventType, type Owner } from '@/api/generated'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 
-type OwnerState = { status: 'loading' } | { status: 'ready'; owner: Owner } | { status: 'error' }
+type PageState =
+  | { status: 'loading' }
+  | { status: 'ready'; owner: Owner; eventTypes: EventType[] }
+  | { status: 'error' }
 
-// Публичная страница Owner — первая страница для Guest: к кому он записывается.
-// Список EventType добавит следующий тикет.
+// Публичная страница Owner — первая страница для Guest: к кому он записывается
+// и какие форматы звонка (EventType) можно забронировать.
 function PublicPage() {
-  const [state, setState] = useState<OwnerState>({ status: 'loading' })
+  const [state, setState] = useState<PageState>({ status: 'loading' })
 
   useEffect(() => {
     // Ответ после ухода со страницы игнорируем
     let cancelled = false
-    getOwner().then(({ data }) => {
-      if (!cancelled) setState(data ? { status: 'ready', owner: data } : { status: 'error' })
+    Promise.all([getOwner(), listEventTypes()]).then(([owner, eventTypes]) => {
+      if (cancelled) return
+      setState(
+        owner.data && eventTypes.data
+          ? { status: 'ready', owner: owner.data, eventTypes: eventTypes.data }
+          : { status: 'error' },
+      )
     })
     return () => {
       cancelled = true
@@ -23,15 +30,15 @@ function PublicPage() {
   }, [])
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <Card className="w-full max-w-md text-center">
+    <main className="flex min-h-screen items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
         {state.status === 'loading' && (
-          <CardHeader>
+          <CardHeader className="text-center">
             <p role="status" className="text-muted-foreground">Загрузка…</p>
           </CardHeader>
         )}
         {state.status === 'error' && (
-          <CardHeader>
+          <CardHeader className="text-center">
             <p role="alert" className="text-destructive">
               Не удалось загрузить страницу. Попробуйте обновить её.
             </p>
@@ -39,24 +46,53 @@ function PublicPage() {
         )}
         {state.status === 'ready' && (
           <>
-            <CardHeader>
+            <CardHeader className="text-center">
               <CardDescription>Запись на звонок</CardDescription>
               <h1 className="font-heading text-2xl leading-snug font-semibold">
                 {state.owner.name}
               </h1>
               <CardDescription className="text-base">
-                Забронируйте звонок в удобное время — без переписки и согласований
+                Выберите формат звонка, затем удобное время
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/booking" className={buttonVariants({ size: 'lg' })}>
-                Забронировать звонок
-              </Link>
+              <EventTypeList eventTypes={state.eventTypes} />
             </CardContent>
           </>
         )}
       </Card>
     </main>
+  )
+}
+
+function EventTypeList({ eventTypes }: { eventTypes: EventType[] }) {
+  if (eventTypes.length === 0) {
+    return (
+      <p className="py-4 text-center text-muted-foreground">
+        Сейчас нет доступных форматов звонка
+      </p>
+    )
+  }
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {eventTypes.map((eventType) => (
+        <li key={eventType.id}>
+          <Link
+            to={`/booking/${eventType.id}`}
+            className="flex flex-col gap-1 rounded-lg border p-3 transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="font-medium">{eventType.name}</h2>
+              <span className="shrink-0 text-muted-foreground">{eventType.durationMinutes} мин</span>
+            </div>
+            {eventType.description && (
+              <p className="text-muted-foreground">{eventType.description}</p>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }
 
