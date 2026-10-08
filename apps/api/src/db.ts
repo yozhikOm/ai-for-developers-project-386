@@ -14,6 +14,16 @@ const migrations: string[] = [
     duration_minutes INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   )`,
+  // 2: Booking. end_at — снимок «начало + длительность» без Buffer; моменты — мс UTC
+  `CREATE TABLE bookings (
+    id TEXT PRIMARY KEY,
+    event_type_id TEXT NOT NULL REFERENCES event_types(id),
+    start_at INTEGER NOT NULL,
+    end_at INTEGER NOT NULL,
+    guest_name TEXT NOT NULL,
+    guest_email TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
 ];
 
 export type OpenedDatabase = {

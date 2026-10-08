@@ -1,11 +1,11 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createEventType } from '@/api/generated'
+import FormField from '@/components/FormField'
 import OwnerLayout from '@/components/OwnerLayout'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   DURATION_MAX,
@@ -114,38 +114,6 @@ function NewEventTypePage() {
         </CardContent>
       </Card>
     </OwnerLayout>
-  )
-}
-
-type FieldProps = {
-  id: string
-  'aria-invalid'?: true
-  'aria-describedby'?: string
-}
-
-// Поле формы с подписью и ошибкой под ним; ошибка связана с полем через aria-describedby
-function FormField({
-  id,
-  label,
-  error,
-  children,
-}: {
-  id: string
-  label: string
-  error?: string
-  children: (fieldProps: FieldProps) => ReactNode
-}) {
-  const errorId = `${id}-error`
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children({ id, ...(error && { 'aria-invalid': true, 'aria-describedby': errorId }) })}
-      {error && (
-        <p id={errorId} className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
   )
 }
 

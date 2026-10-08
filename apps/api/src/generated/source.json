@@ -6,6 +6,45 @@
   },
   "tags": [],
   "paths": {
+    "/api/bookings": {
+      "post": {
+        "operationId": "createBooking",
+        "description": "Создаёт Booking на свободный Slot. Конец вычисляет сервер; занятый Slot отклоняется\nс `SLOT_TAKEN` (409), недоступное начало — с `SLOT_UNAVAILABLE` (422).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBooking"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/event-types": {
       "get": {
         "operationId": "listEventTypes",
@@ -238,9 +277,57 @@
           "VALIDATION_ERROR",
           "NOT_FOUND",
           "EVENT_TYPE_NOT_FOUND",
+          "SLOT_TAKEN",
+          "SLOT_UNAVAILABLE",
           "INTERNAL_ERROR"
         ],
         "description": "Машиночитаемая причина ошибки: клиент различает отказы по ней, а не по тексту."
+      },
+      "Booking": {
+        "type": "object",
+        "required": [
+          "id",
+          "start",
+          "end",
+          "guestName",
+          "guestEmail",
+          "createdAt",
+          "eventType"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Системный id (UUID): его назначает сервер."
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Начало (UTC)."
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Конец (UTC): начало плюс длительность EventType, без Buffer."
+          },
+          "guestName": {
+            "type": "string",
+            "description": "Имя Guest."
+          },
+          "guestEmail": {
+            "type": "string",
+            "description": "Email Guest; регистр не меняется."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Момент создания."
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventTypeSummary"
+          }
+        },
+        "description": "Booking — бронь Guest на интервал `[начало, конец)`."
       },
       "BookingWindowDay": {
         "type": "object",
@@ -304,6 +391,23 @@
         },
         "description": "EventType — вид звонка, который публикует Owner; Guest бронирует время в его рамках."
       },
+      "EventTypeSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "description": "Сводка EventType внутри Booking."
+      },
       "Health": {
         "type": "object",
         "required": [
@@ -318,6 +422,39 @@
           }
         },
         "description": "Ответ проверки живости."
+      },
+      "NewBooking": {
+        "type": "object",
+        "required": [
+          "eventTypeId",
+          "start",
+          "guestName",
+          "guestEmail"
+        ],
+        "properties": {
+          "eventTypeId": {
+            "type": "string",
+            "description": "EventType, в рамках которого Guest бронирует время."
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Начало выбранного Slot (UTC); сервер заново проверяет все правила на момент запроса."
+          },
+          "guestName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Имя Guest. Сервер обрезает пробелы по краям, имя из одних пробелов — пустое."
+          },
+          "guestEmail": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^\\s*[^\\s@]+@[^\\s@]+\\.[^\\s@]+\\s*$",
+            "description": "Email Guest. Пробелы по краям допустимы: сервер их обрезает."
+          }
+        },
+        "description": "Данные новой Booking; конец, id и момент создания назначает сервер."
       },
       "NewEventType": {
         "type": "object",
