@@ -11,7 +11,7 @@ import {
   type Slot,
 } from '@/api/generated'
 import BookingCalendar from '@/components/BookingCalendar'
-import BookingConfirmation from '@/components/BookingConfirmation'
+import BookingConfirmation, { type BookingRejection } from '@/components/BookingConfirmation'
 import BookingConfirmed from '@/components/BookingConfirmed'
 import BookingInfo from '@/components/BookingInfo'
 import SlotList from '@/components/SlotList'
@@ -24,8 +24,20 @@ type PageState =
   | { status: 'not-found' }
   | { status: 'error' }
 
-// Шаг сценария внутри страницы: выбор времени → подтверждение → бронь создана
-type BookingStep = { name: 'time' } | { name: 'confirm' } | { name: 'done'; booking: Booking }
+// Отказ createBooking, после которого Guest возвращается к выбору времени
+type SlotRejection = Exclude<BookingRejection, 'EVENT_TYPE_NOT_FOUND'>
+
+// Шаг сценария внутри страницы: выбор времени → подтверждение → бронь создана.
+// На выбор времени можно вернуться после отказа: тогда над календарём баннер с его причиной
+type BookingStep =
+  | { name: 'time'; rejection?: SlotRejection }
+  | { name: 'confirm' }
+  | { name: 'done'; booking: Booking }
+
+const REJECTION_BANNERS: Record<SlotRejection, string> = {
+  SLOT_TAKEN: 'Пока вы заполняли форму, этот слот заняли. Выберите другое время.',
+  SLOT_UNAVAILABLE: 'Это время уже недоступно для записи. Выберите другое.',
+}
 
 const STEPS = ['Тип встречи', 'Дата и время', 'Ваши данные']
 
@@ -43,6 +55,32 @@ function BookingPage() {
   function selectDate(date: string) {
     if (date !== selectedDate) setSelectedSlot(undefined)
     setSelectedDate(date)
+  }
+
+  // Выбранное время больше не годится: возврат к выбору времени со свежими слотами. День остаётся выбранным.
+  // Занятый слот сразу помечается «Занято», не дожидаясь ответа (и если слоты не загрузятся)
+  function handleRejected(rejection: BookingRejection) {
+    if (rejection === 'EVENT_TYPE_NOT_FOUND') {
+      setState({ status: 'not-found' })
+      return
+    }
+    const rejectedStart = selectedSlot?.start
+    setSelectedSlot(undefined)
+    setStep({ name: 'time', rejection })
+    if (rejection === 'SLOT_TAKEN' && rejectedStart) {
+      setState((current) =>
+        current.status === 'ready' ? { ...current, days: markSlotTaken(current.days, rejectedStart) } : current,
+      )
+    }
+    listSlots({ path: { eventTypeId } }).then(({ data, error }) => {
+      setState((current) => {
+        // Ответ для другого EventType (Guest успел уйти по ссылке) игнорируем
+        if (current.status !== 'ready' || current.eventType.id !== eventTypeId) return current
+        if (error?.code === 'EVENT_TYPE_NOT_FOUND') return { status: 'not-found' }
+        // Если слоты не загрузились, остаются прежние: баннер всё равно просит выбрать другое время
+        return data ? { ...current, days: data } : current
+      })
+    })
   }
 
   useEffect(() => {
@@ -89,6 +127,7 @@ function BookingPage() {
               timeZone={state.owner.timezone}
               onEdit={() => setStep({ name: 'time' })}
               onBooked={(booking) => setStep({ name: 'done', booking })}
+              onRejected={handleRejected}
             />
           </>
         )}
@@ -98,6 +137,14 @@ function BookingPage() {
         {state.status === 'ready' && step.name === 'time' && (
           <>
             <Steps current={2} />
+            {step.rejection && (
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                {REJECTION_BANNERS[step.rejection]}
+              </p>
+            )}
             <div className="grid items-start gap-4 md:grid-cols-[1fr_1.4fr_1fr]">
               <BookingInfo
                 owner={state.owner}
@@ -128,6 +175,14 @@ function BookingPage() {
       </main>
     </div>
   )
+}
+
+// Дни с Slot, начинающимся в start, помеченным «Занято»
+function markSlotTaken(days: BookingWindowDay[], start: string): BookingWindowDay[] {
+  return days.map((day) => ({
+    ...day,
+    slots: day.slots.map((slot) => (slot.start === start ? { ...slot, status: 'taken' } : slot)),
+  }))
 }
 
 // Индикатор шагов «Тип встречи → Дата и время → Ваши данные»; current — номер с 1

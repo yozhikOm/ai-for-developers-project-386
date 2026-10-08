@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookingWindowDay, SlotStatus } from '@/api/generated'
@@ -65,16 +65,19 @@ function stubBookingApi({
   ownerData = owner,
   days = bookingWindow('2026-10-06'),
   createBooking = bookingCreated,
+  listSlots = async () => [200, days],
 }: {
   ownerData?: typeof owner
   days?: BookingWindowDay[]
   createBooking?: (request: Request) => Promise<StubResponse>
+  // Ответ listSlots, если он меняется между запросами (например, после отказа createBooking)
+  listSlots?: (request: Request) => Promise<StubResponse>
 } = {}) {
   return stubApi({
     'GET /api/owner': [200, ownerData],
     'GET /api/event-types': [200, [eventType]],
     [`GET /api/event-types/${eventType.id}`]: [200, eventType],
-    [`GET /api/event-types/${eventType.id}/slots`]: [200, days],
+    [`GET /api/event-types/${eventType.id}/slots`]: listSlots,
     'POST /api/bookings': createBooking,
   })
 }
@@ -387,11 +390,19 @@ describe('подтверждение и создание Booking', () => {
     return screen.getByRole('button', { name: 'Подтвердить запись' })
   }
 
-  // Тела отправленных запросов createBooking
-  function bookingRequests(fetchMock: ReturnType<typeof stubBookingApi>) {
+  // Отправленные запросы к операции API: метод и путь
+  function requestsTo(fetchMock: ReturnType<typeof stubBookingApi>, method: string, pathname: string) {
     return fetchMock.mock.calls
       .map(([request]) => request)
-      .filter((request) => request.method === 'POST' && new URL(request.url).pathname === '/api/bookings')
+      .filter((request) => request.method === method && new URL(request.url).pathname === pathname)
+  }
+
+  function bookingRequests(fetchMock: ReturnType<typeof stubBookingApi>) {
+    return requestsTo(fetchMock, 'POST', '/api/bookings')
+  }
+
+  function slotRequests(fetchMock: ReturnType<typeof stubBookingApi>) {
+    return requestsTo(fetchMock, 'GET', `/api/event-types/${eventType.id}/slots`)
   }
 
   it('«Продолжить» ведёт на подтверждение со сводкой выбора', async () => {
@@ -492,18 +503,119 @@ describe('подтверждение и создание Booking', () => {
     )
   })
 
-  it('при отказе сервера показывает общее сообщение формы', async () => {
+  it.each([
+    ['непредвиденная ошибка', 500, 'INTERNAL_ERROR'],
+    ['сервер отклонил данные', 400, 'VALIDATION_ERROR'],
+  ])('при отказе «%s» показывает общее сообщение формы', async (_title, status, code) => {
     stubBookingApi({
       days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }),
-      createBooking: async () => [500, { code: 'INTERNAL_ERROR', message: 'Ошибка' }],
+      createBooking: async () => [status, { code, message: 'Ошибка' }],
     })
     await continueWithSlot()
 
+    await fillAndConfirm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось создать бронь')
+    expect(screen.getByRole('region', { name: 'Подтверждение записи' })).toBeInTheDocument()
+    expect(confirmButton()).toBeEnabled()
+  })
+
+  // Отказы, после которых выбранное время больше не подходит
+
+  async function fillAndConfirm() {
     await userEvent.type(screen.getByLabelText('Имя'), 'Иван')
     await userEvent.type(screen.getByLabelText('Email'), 'ivan@example.com')
     await userEvent.click(confirmButton())
+  }
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось создать бронь')
-    expect(confirmButton()).toBeEnabled()
+  it('на SLOT_TAKEN показывает баннер и возвращает к выбору времени, где слот уже «Занято»', async () => {
+    // Пока Guest заполнял форму, слот 09:30–10:00 заняли
+    let slotTaken = false
+    const fetchMock = stubBookingApi({
+      listSlots: async () => [
+        200,
+        bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', slotTaken ? 'taken' : 'free'] }),
+      ],
+      createBooking: async () => {
+        slotTaken = true
+        return [409, { code: 'SLOT_TAKEN', message: 'Slot занят' }]
+      },
+    })
+    await continueWithSlot()
+
+    await fillAndConfirm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Пока вы заполняли форму, этот слот заняли. Выберите другое время.',
+    )
+    expect(screen.queryByRole('region', { name: 'Подтверждение записи' })).not.toBeInTheDocument()
+    expect(await within(slotColumn()).findByRole('button', { name: '09:30–10:00 Занято' })).toBeDisabled()
+    expect(slotRequests(fetchMock)).toHaveLength(2)
+    // День остаётся выбранным, а занятый слот — нет
+    expect(dayButton('среда, 7 октября')).toHaveAttribute('aria-pressed', 'true')
+    expect(dayButton('среда, 7 октября')).toHaveTextContent('2 св.')
+    expect(screen.getByRole('region', { name: 'Информация' })).toHaveTextContent('Время: не выбрано')
+    expect(continueButton()).toBeDisabled()
+
+    // Баннер относится к прошлой попытке и после выбора другого времени уходит
+    await userEvent.click(slotButton('09:15–09:45'))
+    await userEvent.click(continueButton())
+
+    expect(await screen.findByRole('heading', { name: 'Подтверждение записи' })).toBeInTheDocument()
+    expect(screen.queryByText(/этот слот заняли/)).not.toBeInTheDocument()
+  })
+
+  it('на SLOT_TAKEN слот «Занято», даже если слоты не удалось запросить заново', async () => {
+    let slotRequestCount = 0
+    stubBookingApi({
+      listSlots: async () => {
+        slotRequestCount += 1
+        return slotRequestCount === 1
+          ? [200, bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] })]
+          : [500, { code: 'INTERNAL_ERROR', message: 'Ошибка' }]
+      },
+      createBooking: async () => [409, { code: 'SLOT_TAKEN', message: 'Slot занят' }],
+    })
+    await continueWithSlot()
+
+    await fillAndConfirm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('этот слот заняли')
+    await waitFor(() => expect(slotRequestCount).toBe(2))
+    expect(slotButton('09:30–10:00')).toHaveTextContent('Занято')
+    expect(slotButton('09:30–10:00')).toBeDisabled()
+    expect(slotButton('09:15–09:45')).toHaveTextContent('Свободно')
+  })
+
+  it('на SLOT_UNAVAILABLE показывает свой баннер и возвращает к выбору времени', async () => {
+    const fetchMock = stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }),
+      createBooking: async () => [422, { code: 'SLOT_UNAVAILABLE', message: 'Начало недоступно' }],
+    })
+    await continueWithSlot()
+
+    await fillAndConfirm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Это время уже недоступно для записи. Выберите другое.',
+    )
+    expect(screen.getByRole('region', { name: 'Календарь' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Подтверждение записи' })).not.toBeInTheDocument()
+    expect(screen.getByText('2. Дата и время')).toHaveAttribute('aria-current', 'step')
+    await waitFor(() => expect(slotRequests(fetchMock)).toHaveLength(2))
+  })
+
+  it('на EVENT_TYPE_NOT_FOUND показывает «Тип больше недоступен» с возвратом к списку типов', async () => {
+    stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }),
+      createBooking: async () => [404, { code: 'EVENT_TYPE_NOT_FOUND', message: 'EventType не найден' }],
+    })
+    await continueWithSlot()
+
+    await fillAndConfirm()
+
+    expect(await screen.findByRole('heading', { name: 'Тип больше недоступен' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Подтверждение записи' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'К списку типов' })).toHaveAttribute('href', '/')
   })
 })
