@@ -48,6 +48,22 @@ jobs:
         # Локальный режим: скрипт сам поднимает собранное приложение
         run: npm run smoke
 
+      - name: Install Playwright Chromium
+        # Браузер и его системные зависимости; версия — из @playwright/test в lock-файле
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        # Playwright сам поднимает собранное приложение на временной БД
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
   docker:
     name: Docker build & smoke
     runs-on: ubuntu-latest

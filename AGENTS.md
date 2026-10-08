@@ -27,6 +27,11 @@
   `localhost:3000`. Запросы к API — только через сгенерированный SDK
   (`@/api/generated`).
 - `scripts/smoke.mjs` — smoke test на чистом Node, без зависимостей.
+- `e2e/` + `playwright.config.ts` (корень) — сквозной сценарий в браузере
+  (Playwright, только Chromium). Сервер поднимает сам Playwright, как `npm start`,
+  на свежей временной БД; пояс браузера намеренно отличается от пояса Owner.
+  Бизнес-правила по-прежнему проверяются тестами API и RTL, e2e — только сценарий.
+  Типы e2e проверяет `npm run typecheck` (`e2e/tsconfig.json`).
 - `vitest.config.ts` (корень) — единый запуск тестов, `projects: ['apps/*']`;
   окружение каждый пакет описывает в своём конфиге.
 - `eslint.config.mjs` (корень) — единый ESLint 10 flat config.
@@ -42,6 +47,7 @@
 | `npm run build` | сборка frontend в `apps/web/dist` |
 | `npm start` | prod-режим: один процесс, порт 3000 (API + статика) |
 | `npm run smoke` | smoke test запущенного приложения (требует предварительный `npm run build`) |
+| `npm run e2e` | e2e-сценарий в Chromium (требует `npm run build` и один раз `npx playwright install chromium`); в `check` не входит |
 | `npm run docker:build` / `npm run docker:run` | сборка и запуск Docker-образа |
 
 ## Правила для backend (важно: нативный type stripping)
@@ -92,7 +98,7 @@ Backend запускается Node.js 24 напрямую из `.ts`-исход
 - `.github/workflows/hexlet-check.yml` — **не изменять и не удалять**.
 - `.env` не коммитить; шаблон переменных — `.env.example`.
 - CI живёт в `.github/workflows/ci.yml` (дрейф генерации, lint, typecheck, тесты,
-  build, smoke, Docker).
+  build, smoke, e2e, Docker).
 
 ## Agent skills
 

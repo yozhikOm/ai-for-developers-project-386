@@ -13,7 +13,7 @@
 - Node.js 24, TypeScript, npm workspaces
 - Backend: Fastify 5 (нативный запуск TypeScript без компиляции)
 - Frontend: React 19, Vite
-- Тесты: Vitest (+ React Testing Library), smoke test
+- Тесты: Vitest (+ React Testing Library), smoke test, e2e на Playwright (Chromium)
 - Линт: ESLint 10 (flat config)
 - CI: GitHub Actions; Docker (multi-stage)
 
@@ -49,6 +49,8 @@ npm run generate
 # Проверки
 npm run check          # lint + typecheck + тесты
 npm run smoke          # smoke test запущенного приложения (после npm run build)
+npm run e2e            # сквозной сценарий в браузере (после npm run build;
+                       # один раз: npx playwright install chromium)
 
 # Docker
 npm run docker:build   # сборка образа call-calendar

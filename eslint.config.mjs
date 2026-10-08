@@ -10,7 +10,8 @@ import tseslint from 'typescript-eslint'
 export default defineConfig(
   // generated — код из `npm run generate` (ADR 0004): руками не правится,
   // поэтому правилам проекта следовать не обязан
-  globalIgnores(['**/dist', '**/node_modules', '**/generated']),
+  // test-results и playwright-report — вывод Playwright (npm run e2e)
+  globalIgnores(['**/dist', '**/node_modules', '**/generated', 'test-results', 'playwright-report']),
   {
     files: ['**/*.{js,mjs,ts,tsx}'],
     extends: [js.configs.recommended],
