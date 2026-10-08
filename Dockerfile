@@ -24,6 +24,7 @@ RUN npm prune --omit=dev
 # поэтому шаг компиляции backend не нужен — копируем исходники как есть
 FROM node:24-alpine
 ENV NODE_ENV=production
+# Порт по умолчанию; платформа деплоя (Render) и проверка Хекслета задают свой через PORT
 ENV PORT=3000
 WORKDIR /app
 
@@ -31,11 +32,17 @@ COPY --from=build /app/node_modules ./node_modules
 COPY apps/api ./apps/api
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 
+# Каталог SQLite (ADR 0005). Владелец — node, чтобы процесс мог писать в него;
+# новый именованный volume, смонтированный сюда, наследует владельца
+ENV DATABASE_PATH=/app/data/calendar.db
+RUN mkdir -p /app/data && chown node:node /app/data
+
 # Непривилегированный пользователь из базового образа
 USER node
 
 EXPOSE 3000
+# Shell-форма: ${PORT} подставляется при каждой проверке, а не при сборке
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/api/health" || exit 1
 
 CMD ["node", "apps/api/src/index.ts"]

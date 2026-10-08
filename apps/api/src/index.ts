@@ -4,8 +4,11 @@ import { buildApp } from './app.ts';
 // Порт и хост берутся из окружения; 0.0.0.0 нужен для работы внутри Docker-контейнера.
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';
+// Файл SQLite; относительный путь считается от текущего каталога процесса
+const databasePath = process.env.DATABASE_PATH || 'data/calendar.db';
 
-const app = await buildApp();
+// Новую БД засеваем стартовыми EventType, существующую не трогаем
+const app = await buildApp({ databasePath, seedNewDatabase: true });
 
 try {
   await app.listen({ port, host });
