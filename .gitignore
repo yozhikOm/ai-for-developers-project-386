@@ -10,5 +10,9 @@ data/
 # Локальные переменные окружения (в репозитории — только .env.example)
 .env
 
+# Результаты и отчёты Playwright (npm run e2e)
+test-results/
+playwright-report/
+
 # Логи и временные файлы
 *.log
