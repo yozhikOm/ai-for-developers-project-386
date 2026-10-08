@@ -185,6 +185,21 @@ export type Slot = {
  */
 export type SlotStatus = 'free' | 'taken';
 
+/**
+ * Предстоящие Booking всех EventType для Owner. «Текущая» и «предстоящая» — производные
+ * состояния: сервер вычисляет их на момент запроса, закончившиеся Booking не попадают никуда.
+ */
+export type UpcomingBookings = {
+    /**
+     * Идущая сейчас Booking (начало ≤ сейчас < конец); если такой нет, поле отсутствует.
+     */
+    current?: Booking;
+    /**
+     * Booking с началом позже текущего момента, по возрастанию начала.
+     */
+    upcoming: Array<Booking>;
+};
+
 export type CreateBookingData = {
     body: NewBooking;
     path?: never;
@@ -209,6 +224,31 @@ export type CreateBookingResponses = {
 };
 
 export type CreateBookingResponse = CreateBookingResponses[keyof CreateBookingResponses];
+
+export type ListUpcomingBookingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/bookings/upcoming';
+};
+
+export type ListUpcomingBookingsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type ListUpcomingBookingsError = ListUpcomingBookingsErrors[keyof ListUpcomingBookingsErrors];
+
+export type ListUpcomingBookingsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: UpcomingBookings;
+};
+
+export type ListUpcomingBookingsResponse = ListUpcomingBookingsResponses[keyof ListUpcomingBookingsResponses];
 
 export type ListEventTypesData = {
     body?: never;

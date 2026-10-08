@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import BookingPage from './pages/BookingPage.tsx'
 import NewEventTypePage from './pages/NewEventTypePage.tsx'
 import OwnerEventTypesPage from './pages/OwnerEventTypesPage.tsx'
+import OwnerUpcomingPage from './pages/OwnerUpcomingPage.tsx'
 import PublicPage from './pages/PublicPage.tsx'
 // ПРОТОТИП, выбросить: тикет «Экраны и сценарии гостя и владельца»
 import ScreensPrototype from './prototype/screens/ScreensPrototype.tsx'
@@ -13,8 +14,9 @@ function App() {
     <Routes>
       <Route path="/" element={<PublicPage />} />
       <Route path="/booking/:eventTypeId" element={<BookingPage />} />
-      {/* Раздел Owner; пока в нём одна вкладка — «Типы событий» */}
-      <Route path="/owner" element={<Navigate to="/owner/event-types" replace />} />
+      {/* Раздел Owner: вкладки «Предстоящие» (открывается по умолчанию) и «Типы событий» */}
+      <Route path="/owner" element={<Navigate to="/owner/upcoming" replace />} />
+      <Route path="/owner/upcoming" element={<OwnerUpcomingPage />} />
       <Route path="/owner/event-types" element={<OwnerEventTypesPage />} />
       <Route path="/owner/event-types/new" element={<NewEventTypePage />} />
       {import.meta.env.DEV && <Route path="/prototype/screens" element={<ScreensPrototype />} />}

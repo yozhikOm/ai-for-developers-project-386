@@ -1,4 +1,4 @@
-// Даты и время для Guest — по поясу Owner, а не браузера.
+// Даты и время для Guest и Owner — по поясу Owner, а не браузера.
 // Даты дней (plainDate «YYYY-MM-DD») уже посчитаны сервером в поясе Owner:
 // их нельзя разбирать через new Date(date) и getDate(), иначе в поясе западнее
 // UTC день съедет на предыдущий. Поэтому календарная арифметика здесь идёт в UTC.
@@ -59,15 +59,28 @@ export function formatDayLabel(date: string): string {
   return dayLabelFormat.format(plainDateToUtc(date))
 }
 
+function timeFormat(timeZone: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
+}
+
 // Интервал слота по поясу Owner: «09:00–09:30». start и end — моменты UTC (ISO 8601)
 export function formatTimeRange(start: string, end: string, timeZone: string): string {
-  const format = new Intl.DateTimeFormat('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone,
-  })
+  const format = timeFormat(timeZone)
   return `${format.format(new Date(start))}–${format.format(new Date(end))}`
+}
+
+// Дата момента UTC по поясу Owner: «среда, 7 октября»
+export function formatMomentDay(moment: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', timeZone }).format(
+    new Date(moment),
+  )
+}
+
+// Дата и время момента UTC по поясу Owner: «6 октября, 09:15».
+// Собираем из частей: склейку даты и времени Intl в разных версиях ICU пишет по-разному
+export function formatMomentDateTime(moment: string, timeZone: string): string {
+  const date = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone }).format(new Date(moment))
+  return `${date}, ${timeFormat(timeZone).format(new Date(moment))}`
 }
 
 // Названия поясов России в дательном падеже: «по Москве»

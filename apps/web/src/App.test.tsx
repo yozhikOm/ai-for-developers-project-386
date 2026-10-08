@@ -115,6 +115,7 @@ function stubApiWithEventTypes(initial: unknown[]) {
   const fetchMock = stubApi({
     'GET /api/owner': [200, owner],
     'GET /api/event-types': async () => [200, eventTypes],
+    'GET /api/bookings/upcoming': [200, { upcoming: [] }],
     'POST /api/event-types': async (request) => {
       const body = await request.json()
       createdBodies.push(body)
@@ -140,20 +141,23 @@ async function openNewEventTypeScreen() {
 }
 
 describe('раздел Owner: типы событий', () => {
-  it('ссылка «Вход для владельца» на публичной странице ведёт в раздел Owner', async () => {
+  it('ссылка «Вход для владельца» ведёт в раздел Owner, вкладка «Типы событий» открывается из него', async () => {
     stubApiWithEventTypes([eventTypeWithDescription])
     renderApp('/')
 
     await userEvent.click(await screen.findByRole('link', { name: 'Вход для владельца' }))
-
     expect(await screen.findByRole('heading', { level: 1, name: 'Кабинет владельца' })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'Типы событий (1)' })).toHaveAttribute('aria-current', 'page')
+    await userEvent.click(await screen.findByRole('link', { name: 'Типы событий (1)' }))
+
+    expect(screen.getByRole('link', { name: 'Типы событий (1)' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByRole('link', { name: 'Предстоящие (0)' })).not.toHaveAttribute('aria-current')
+    expect(await screen.findByRole('table')).toHaveTextContent('Знакомство')
   })
 
   it('показывает счётчик во вкладке и таблицу: название, описание или «—», длительность', async () => {
     stubApiWithEventTypes([eventTypeWithDescription, eventTypeWithoutDescription])
 
-    renderApp('/owner')
+    renderApp('/owner/event-types')
 
     expect(await screen.findByRole('link', { name: 'Типы событий (2)' })).toBeInTheDocument()
     const [, ...rows] = screen.getAllByRole('row')

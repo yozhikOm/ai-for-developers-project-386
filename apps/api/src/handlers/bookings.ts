@@ -6,13 +6,14 @@ import type { RouteHandlers } from '../generated/fastify.gen.ts';
 import type { Owner } from '../generated/index.ts';
 import { findEventTypeOrThrow } from './eventTypes.ts';
 
-// createBooking — Guest бронирует Slot; правила заново проверяются на момент запроса
+// createBooking — Guest бронирует Slot; правила заново проверяются на момент запроса.
+// listUpcomingBookings — текущая и предстоящие Booking для Owner на момент запроса
 export function bookingHandlers(
   eventTypes: EventTypeStore,
   bookings: BookingStore,
   owner: Owner,
   now: () => Date,
-): Pick<RouteHandlers, 'createBooking'> {
+): Pick<RouteHandlers, 'createBooking' | 'listUpcomingBookings'> {
   return {
     createBooking(request, reply) {
       // Длины, формат email и начала уже проверены по контракту
@@ -48,6 +49,16 @@ export function bookingHandlers(
         },
       );
       reply.code(201).send(booking);
+    },
+
+    listUpcomingBookings(_request, reply) {
+      const moment = now();
+      // Закончившиеся Booking отсекает запрос: остаются текущая (начало ≤ сейчас < конец)
+      // и предстоящие (начало позже сейчас). Брони не пересекаются, поэтому текущая одна
+      const active = bookings.listEndingAfter(moment);
+      const current = active.find((booking) => Date.parse(booking.start) <= moment.getTime());
+      const upcoming = active.filter((booking) => booking !== current);
+      reply.code(200).send(current ? { current, upcoming } : { upcoming });
     },
   };
 }

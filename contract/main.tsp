@@ -160,6 +160,18 @@ model Booking {
   eventType: EventTypeSummary;
 }
 
+/**
+ * Предстоящие Booking всех EventType для Owner. «Текущая» и «предстоящая» — производные
+ * состояния: сервер вычисляет их на момент запроса, закончившиеся Booking не попадают никуда.
+ */
+model UpcomingBookings {
+  /** Идущая сейчас Booking (начало ≤ сейчас < конец); если такой нет, поле отсутствует. */
+  current?: Booking;
+
+  /** Booking с началом позже текущего момента, по возрастанию начала. */
+  upcoming: Booking[];
+}
+
 /** Данные новой Booking; конец, id и момент создания назначает сервер. */
 model NewBooking {
   /** EventType, в рамках которого Guest бронирует время. */
@@ -232,3 +244,9 @@ op createBooking(@body body: NewBooking): {
   @statusCode statusCode: 201;
   @body body: Booking;
 } | ApiError;
+
+/** Текущая и предстоящие Booking для раздела Owner; пагинации нет. */
+@route("/bookings/upcoming")
+@get
+@operationId("listUpcomingBookings")
+op listUpcomingBookings(): UpcomingBookings | ApiError;

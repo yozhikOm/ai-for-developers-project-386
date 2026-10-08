@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { listEventTypes, type EventType } from '@/api/generated'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { listEventTypes, listUpcomingBookings, type EventType } from '@/api/generated'
 import OwnerLayout from '@/components/OwnerLayout'
+import OwnerTabs from '@/components/OwnerTabs'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -14,10 +15,11 @@ type PageState =
   | { status: 'ready'; eventTypes: EventType[] }
   | { status: 'error' }
 
-// Раздел Owner, вкладка «Типы событий»: опубликованные EventType и создание нового.
-// Вкладку «Предстоящие» добавит тикет предстоящих Booking.
+// Раздел Owner, вкладка «Типы событий»: опубликованные EventType и создание нового
 function OwnerEventTypesPage() {
   const [state, setState] = useState<PageState>({ status: 'loading' })
+  // Число предстоящих Booking нужно только для счётчика соседней вкладки: без него страница работает
+  const [upcomingCount, setUpcomingCount] = useState<number>()
   const location = useLocation()
   const navigate = useNavigate()
   // Подсветка — только сразу после создания: id запоминаем, а из истории его убираем,
@@ -39,6 +41,9 @@ function OwnerEventTypesPage() {
       if (cancelled) return
       setState(data ? { status: 'ready', eventTypes: data } : { status: 'error' })
     })
+    listUpcomingBookings().then(({ data }) => {
+      if (!cancelled && data) setUpcomingCount(data.upcoming.length)
+    })
     return () => {
       cancelled = true
     }
@@ -48,19 +53,10 @@ function OwnerEventTypesPage() {
     <OwnerLayout>
       <div className="flex flex-col gap-4">
         <h1 className="font-heading text-2xl font-semibold">Кабинет владельца</h1>
-        <nav aria-label="Разделы кабинета" className="flex gap-2 border-b">
-          <NavLink
-            to="/owner/event-types"
-            className={({ isActive }) =>
-              cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm',
-                isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground',
-              )
-            }
-          >
-            {state.status === 'ready' ? `Типы событий (${state.eventTypes.length})` : 'Типы событий'}
-          </NavLink>
-        </nav>
+        <OwnerTabs
+          upcomingCount={upcomingCount}
+          eventTypesCount={state.status === 'ready' ? state.eventTypes.length : undefined}
+        />
 
         {state.status === 'loading' && (
           <p role="status" className="text-muted-foreground">Загрузка…</p>
