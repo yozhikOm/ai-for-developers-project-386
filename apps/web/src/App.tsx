@@ -4,8 +4,6 @@ import NewEventTypePage from './pages/NewEventTypePage.tsx'
 import OwnerEventTypesPage from './pages/OwnerEventTypesPage.tsx'
 import OwnerUpcomingPage from './pages/OwnerUpcomingPage.tsx'
 import PublicPage from './pages/PublicPage.tsx'
-// ПРОТОТИП, выбросить: тикет «Экраны и сценарии гостя и владельца»
-import ScreensPrototype from './prototype/screens/ScreensPrototype.tsx'
 
 // Корневой компонент: маршруты приложения. Роутер (BrowserRouter) подключает
 // main.tsx, чтобы тесты могли рендерить приложение в MemoryRouter на нужном URL.
@@ -19,7 +17,6 @@ function App() {
       <Route path="/owner/upcoming" element={<OwnerUpcomingPage />} />
       <Route path="/owner/event-types" element={<OwnerEventTypesPage />} />
       <Route path="/owner/event-types/new" element={<NewEventTypePage />} />
-      {import.meta.env.DEV && <Route path="/prototype/screens" element={<ScreensPrototype />} />}
     </Routes>
   )
 }
