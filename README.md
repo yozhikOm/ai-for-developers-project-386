@@ -8,6 +8,14 @@
 Учебный проект Хекслета: https://ru.hexlet.io/programs/ai-for-developers
 Как это должно работать: https://files.hexlet.app/a/2ipc5m
 
+## Демо
+
+Приложение задеплоено на Render: https://ai-for-developers-project-386-og4b.onrender.com/
+
+Бесплатный тариф Render: после ~15 минут без запросов сервис засыпает, и первый
+запрос после этого идёт около минуты. Диск эфемерный: при рестарте и редеплое
+SQLite-база сбрасывается и заново засевается стартовыми типами событий.
+
 ## Стек
 
 - Node.js 24, TypeScript, npm workspaces
@@ -55,6 +63,9 @@ npm run e2e            # сквозной сценарий в браузере (
 # Docker
 npm run docker:build   # сборка образа call-calendar
 npm run docker:run     # запуск на http://localhost:3000, данные — в volume call-calendar-data
+
+# Другой порт внутри контейнера задаётся переменной PORT
+docker run --rm -e PORT=8080 -p 8080:8080 call-calendar
 ```
 
 ---

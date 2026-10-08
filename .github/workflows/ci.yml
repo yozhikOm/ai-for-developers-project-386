@@ -79,8 +79,9 @@ jobs:
       - name: Build image
         run: docker build -t call-calendar-ci .
 
+      # Нестандартный PORT: проверяем, что приложение слушает порт из окружения
       - name: Run container
-        run: docker run -d -p 3100:3000 --name call-calendar call-calendar-ci
+        run: docker run -d -e PORT=8080 -p 3100:8080 --name call-calendar call-calendar-ci
 
       - name: Smoke test against container
         run: SMOKE_URL=http://localhost:3100 node scripts/smoke.mjs
