@@ -148,13 +148,60 @@ describe('POST /api/bookings', () => {
     }
   });
 
-  it('начало не на 15-минутной сетке отвечает 422 SLOT_UNAVAILABLE', async () => {
+  // Существующая Booking — среда 12:00–12:30 по Москве; новая — другого EventType
+  it.each([
+    ['30 минут вплотную после', '2026-10-07T09:30:00.000Z', 30], // 12:30–13:00
+    ['30 минут вплотную до', '2026-10-07T08:30:00.000Z', 30], // 11:30–12:00
+    ['45 минут вплотную до', '2026-10-07T08:15:00.000Z', 45], // 11:15–12:00
+  ])('Booking ближе Buffer к другой отвечает 409 SLOT_TAKEN: %s', async (_title, start, durationMinutes) => {
+    const booked = await createEventType(app, 30);
+    const eventType = await createEventType(app, durationMinutes, 'Проверяемый тип');
+    expect((await createBooking(app, bookingPayload(booked.id, WEDNESDAY_12_00))).statusCode).toBe(201);
+
+    const response = await createBooking(app, bookingPayload(eventType.id, start));
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ code: 'SLOT_TAKEN', message: expect.any(String) });
+  });
+
+  it('Booking ровно через Buffer 15 минут до и после другой создаётся', async () => {
+    const eventType = await createEventType(app, 30);
+    expect((await createBooking(app, bookingPayload(eventType.id, WEDNESDAY_12_00))).statusCode).toBe(201);
+
+    // 11:15–11:45 и 12:45–13:15 по Москве
+    const before = await createBooking(app, bookingPayload(eventType.id, '2026-10-07T08:15:00.000Z'));
+    const after = await createBooking(app, bookingPayload(eventType.id, '2026-10-07T09:45:00.000Z'));
+
+    expect(before.statusCode).toBe(201);
+    expect(after.statusCode).toBe(201);
+  });
+
+  // «Сейчас» — вторник 6 октября 10:00 по Москве; окно — с 6 по 19 октября
+  it.each([
+    ['начало не на 15-минутной сетке', '2026-10-07T09:05:00.000Z'], // среда 12:05
+    ['вне BookingWindow', '2026-10-20T09:00:00.000Z'], // вторник 20 октября 12:00
+    ['до начала WorkingHours', '2026-10-07T05:45:00.000Z'], // среда 08:45
+    ['слот заканчивался бы после 18:00', '2026-10-07T14:45:00.000Z'], // среда 17:45–18:15
+    ['начало в 18:00', '2026-10-07T15:00:00.000Z'], // среда 18:00
+    ['в выходной', '2026-10-10T09:00:00.000Z'], // суббота 12:00
+    ['внутри MinimumNotice', '2026-10-06T07:45:00.000Z'], // сегодня 10:45
+    ['в прошлом', '2026-10-06T06:00:00.000Z'], // сегодня 09:00
+  ])('отвечает 422 SLOT_UNAVAILABLE: %s', async (_title, start) => {
     const eventType = await createEventType(app, 30);
 
-    const response = await createBooking(app, bookingPayload(eventType.id, '2026-10-07T09:05:00.000Z'));
+    const response = await createBooking(app, bookingPayload(eventType.id, start));
 
     expect(response.statusCode).toBe(422);
     expect(response.json()).toEqual({ code: 'SLOT_UNAVAILABLE', message: expect.any(String) });
+  });
+
+  it('начало ровно через MinimumNotice 60 минут доступно', async () => {
+    const eventType = await createEventType(app, 30);
+
+    // Сегодня 11:00 по Москве
+    const response = await createBooking(app, bookingPayload(eventType.id, '2026-10-06T08:00:00.000Z'));
+
+    expect(response.statusCode).toBe(201);
   });
 
   it('на краях рабочего дня Buffer не применяется: брони с 09:00 и до 18:00 возможны', async () => {

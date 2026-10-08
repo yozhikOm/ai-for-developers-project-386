@@ -1,11 +1,21 @@
 import { useId, useState, type FormEvent } from 'react'
-import { createBooking, type Booking, type EventType, type Slot } from '@/api/generated'
+import { createBooking, type ApiErrorCode, type Booking, type EventType, type Slot } from '@/api/generated'
 import FormField from '@/components/FormField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toNewBooking, validateBookingForm, type BookingFormValues } from '@/lib/bookingForm'
 import { formatDayLabel, formatTimeRange } from '@/lib/ownerCalendar'
+
+// Отказы, после которых выбранное время или EventType больше не годятся: их разбирает BookingPage.
+// Остальные (VALIDATION_ERROR, INTERNAL_ERROR, сбой сети) — общее сообщение формы
+const REJECTIONS = ['SLOT_TAKEN', 'SLOT_UNAVAILABLE', 'EVENT_TYPE_NOT_FOUND'] as const satisfies ApiErrorCode[]
+
+export type BookingRejection = (typeof REJECTIONS)[number]
+
+function isRejection(code: ApiErrorCode | undefined): code is BookingRejection {
+  return REJECTIONS.some((rejection) => rejection === code)
+}
 
 type BookingConfirmationProps = {
   eventType: EventType
@@ -16,10 +26,19 @@ type BookingConfirmationProps = {
   timeZone: string
   onEdit: () => void
   onBooked: (booking: Booking) => void
+  onRejected: (rejection: BookingRejection) => void
 }
 
 // Шаг «Ваши данные»: сводка выбора, имя и email Guest, «Подтвердить запись» и «Изменить»
-function BookingConfirmation({ eventType, date, slot, timeZone, onEdit, onBooked }: BookingConfirmationProps) {
+function BookingConfirmation({
+  eventType,
+  date,
+  slot,
+  timeZone,
+  onEdit,
+  onBooked,
+  onRejected,
+}: BookingConfirmationProps) {
   const headingId = useId()
   const [values, setValues] = useState<BookingFormValues>({ guestName: '', guestEmail: '' })
   // Ошибки под полями показываем после первой попытки отправить форму
@@ -39,13 +58,16 @@ function BookingConfirmation({ eventType, date, slot, timeZone, onEdit, onBooked
 
     setSubmitting(true)
     setFailed(false)
-    // Различимые отказы (слот заняли или он стал недоступен) разбирает следующий тикет;
-    // пока любой отказ — общее сообщение формы
-    const { data } = await createBooking({ body: toNewBooking(values, eventType.id, slot.start) }).catch(() => ({
-      data: undefined,
-    }))
+    const { data, error } = await createBooking({ body: toNewBooking(values, eventType.id, slot.start) }).catch(
+      () => ({ data: undefined, error: undefined }),
+    )
     if (data) {
       onBooked(data)
+      return
+    }
+    const code = error?.code
+    if (isRejection(code)) {
+      onRejected(code)
       return
     }
     setSubmitting(false)
