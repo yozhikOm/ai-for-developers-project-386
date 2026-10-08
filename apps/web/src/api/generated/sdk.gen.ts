@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { CreateBookingData, CreateBookingErrors, CreateBookingResponses, CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetEventTypeData, GetEventTypeErrors, GetEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses, ListSlotsData, ListSlotsErrors, ListSlotsResponses } from './types.gen.ts';
+import type { CreateBookingData, CreateBookingErrors, CreateBookingResponses, CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetEventTypeData, GetEventTypeErrors, GetEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses, ListSlotsData, ListSlotsErrors, ListSlotsResponses, ListUpcomingBookingsData, ListUpcomingBookingsErrors, ListUpcomingBookingsResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -30,6 +30,11 @@ export const createBooking = <ThrowOnError extends boolean = false>(options: Opt
         ...options.headers
     }
 });
+
+/**
+ * Текущая и предстоящие Booking для раздела Owner; пагинации нет.
+ */
+export const listUpcomingBookings = <ThrowOnError extends boolean = false>(options?: Options<ListUpcomingBookingsData, ThrowOnError>): RequestResult<ListUpcomingBookingsResponses, ListUpcomingBookingsErrors, ThrowOnError> => (options?.client ?? client).get<ListUpcomingBookingsResponses, ListUpcomingBookingsErrors, ThrowOnError>({ url: '/api/bookings/upcoming', ...options });
 
 /**
  * Все EventType по возрастанию времени создания.
