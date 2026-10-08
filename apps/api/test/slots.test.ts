@@ -181,6 +181,80 @@ describe('GET /api/event-types/{eventTypeId}/slots', () => {
     });
   });
 
+  describe('занятость с учётом Buffer', () => {
+    // Бронь 12:00–12:30 по Москве в среду 7 октября
+    const BOOKING_START = '2026-10-07T09:00:00.000Z';
+
+    // Начало слота в среду по московскому времени «ЧЧ:ММ» → момент UTC
+    const wednesdayAt = (time: string) => new Date(`2026-10-07T${time}:00.000+03:00`).toISOString();
+
+    async function bookNoon(app: App, eventTypeId: string) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/bookings',
+        payload: { eventTypeId, start: BOOKING_START, guestName: 'Иван Петров', guestEmail: 'ivan@example.com' },
+      });
+      expect(response.statusCode).toBe(201);
+    }
+
+    // Статусы слотов среды по началу «ЧЧ:ММ» по Москве
+    async function wednesdayStatuses(app: App, eventTypeId: string) {
+      const day = (await listSlots(app, eventTypeId)).find((windowDay) => windowDay.date === '2026-10-07')!;
+      return (time: string) => day.slots.find((slot) => slot.start === wednesdayAt(time))?.status;
+    }
+
+    it('слоты того же типа, пересекающие бронь с Buffer 15 минут, заняты; через перерыв 15 минут — свободны', async () => {
+      const app = await appAt(TUESDAY_10_00_MSK);
+      const { id } = await createEventType(app, 30);
+      await bookNoon(app, id);
+
+      const statusAt = await wednesdayStatuses(app, id);
+
+      for (const time of ['11:30', '11:45', '12:00', '12:15', '12:30']) {
+        expect(statusAt(time), time).toBe('taken');
+      }
+      // 11:15–11:45 и 12:45–13:15 отделены от брони ровно 15 минутами
+      expect(statusAt('11:15')).toBe('free');
+      expect(statusAt('12:45')).toBe('free');
+
+      await app.close();
+    });
+
+    it('бронь одного типа занимает пересекающиеся слоты другого типа', async () => {
+      const app = await appAt(TUESDAY_10_00_MSK);
+      const short = await createEventType(app, 30);
+      const long = await createEventType(app, 60);
+      await bookNoon(app, short.id);
+
+      const statusAt = await wednesdayStatuses(app, long.id);
+
+      for (const time of ['11:00', '11:15', '11:30', '11:45', '12:00', '12:15', '12:30']) {
+        expect(statusAt(time), time).toBe('taken');
+      }
+      expect(statusAt('10:45')).toBe('free');
+      expect(statusAt('12:45')).toBe('free');
+
+      await app.close();
+    });
+
+    it('ответ не содержит данных гостей', async () => {
+      const app = await appAt(TUESDAY_10_00_MSK);
+      const { id } = await createEventType(app, 30);
+      await bookNoon(app, id);
+
+      const response = await app.inject({ method: 'GET', url: `/api/event-types/${id}/slots` });
+
+      expect(response.body).not.toContain('Иван Петров');
+      expect(response.body).not.toContain('ivan@example.com');
+      const fields = new Set(
+        (response.json() as BookingWindowDay[]).flatMap((day) => day.slots.flatMap((slot) => Object.keys(slot))),
+      );
+      expect(fields).toEqual(new Set(['start', 'end', 'status']));
+
+      await app.close();
+    });
+  });
+
   describe('MinimumNotice', () => {
     it.each([
       ['в 14:00 первый слот в 15:00', '2026-10-06T11:00:00.000Z', '2026-10-06T12:00:00.000Z'],

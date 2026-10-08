@@ -3,11 +3,13 @@ import path from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import fastifyOpenapiGlue from 'fastify-openapi-glue';
+import { createBookingStore } from './bookings.ts';
 import { readOwner } from './config.ts';
 import { openDatabase } from './db.ts';
 import { isApiUrl, registerApiErrors, replyApiNotFound } from './errors.ts';
 import { createEventTypeStore } from './eventTypes.ts';
 import type { RouteHandlers } from './generated/fastify.gen.ts';
+import { bookingHandlers } from './handlers/bookings.ts';
 import { eventTypeHandlers } from './handlers/eventTypes.ts';
 import { healthHandlers } from './handlers/health.ts';
 import { ownerHandlers } from './handlers/owner.ts';
@@ -50,6 +52,7 @@ export async function buildApp({
   });
 
   const eventTypes = createEventTypeStore(db);
+  const bookings = createBookingStore(db);
   if (seedNewDatabase && isNew) {
     seedEventTypes(eventTypes, now());
   }
@@ -63,7 +66,8 @@ export async function buildApp({
     ...healthHandlers(),
     ...ownerHandlers(owner),
     ...eventTypeHandlers(eventTypes, now),
-    ...slotHandlers(eventTypes, owner, now),
+    ...slotHandlers(eventTypes, bookings, owner, now),
+    ...bookingHandlers(eventTypes, bookings, owner, now),
   };
 
   // Маршруты и проверку запросов регистрирует glue по спеке;

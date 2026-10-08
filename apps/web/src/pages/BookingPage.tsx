@@ -4,12 +4,15 @@ import {
   getEventType,
   getOwner,
   listSlots,
+  type Booking,
   type BookingWindowDay,
   type EventType,
   type Owner,
   type Slot,
 } from '@/api/generated'
 import BookingCalendar from '@/components/BookingCalendar'
+import BookingConfirmation from '@/components/BookingConfirmation'
+import BookingConfirmed from '@/components/BookingConfirmed'
 import BookingInfo from '@/components/BookingInfo'
 import SlotList from '@/components/SlotList'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -21,13 +24,18 @@ type PageState =
   | { status: 'not-found' }
   | { status: 'error' }
 
+// Шаг сценария внутри страницы: выбор времени → подтверждение → бронь создана
+type BookingStep = { name: 'time' } | { name: 'confirm' } | { name: 'done'; booking: Booking }
+
 const STEPS = ['Тип встречи', 'Дата и время', 'Ваши данные']
 
-// Экран выбора времени для EventType (/booking/:eventTypeId): шаг «Дата и время».
-// Открывается и по прямой ссылке: всё нужное загружает сам по id из URL.
+// Запись на звонок для EventType (/booking/:eventTypeId): шаги «Дата и время» и «Ваши данные»,
+// затем подтверждение брони. Открывается и по прямой ссылке: всё нужное загружает сам по id из URL.
+// Выбранные день и слот живут здесь, поэтому «Изменить» возвращает к выбору времени с ними.
 function BookingPage() {
   const { eventTypeId = '' } = useParams()
   const [state, setState] = useState<PageState>({ status: 'loading' })
+  const [step, setStep] = useState<BookingStep>({ name: 'time' })
   const [selectedDate, setSelectedDate] = useState<string>()
   const [selectedSlot, setSelectedSlot] = useState<Slot>()
 
@@ -71,7 +79,23 @@ function BookingPage() {
           </p>
         )}
         {state.status === 'not-found' && <EventTypeNotFound />}
-        {state.status === 'ready' && (
+        {state.status === 'ready' && step.name === 'confirm' && selectedDate && selectedSlot && (
+          <>
+            <Steps current={3} />
+            <BookingConfirmation
+              eventType={state.eventType}
+              date={selectedDate}
+              slot={selectedSlot}
+              timeZone={state.owner.timezone}
+              onEdit={() => setStep({ name: 'time' })}
+              onBooked={(booking) => setStep({ name: 'done', booking })}
+            />
+          </>
+        )}
+        {state.status === 'ready' && step.name === 'done' && selectedDate && (
+          <BookingConfirmed booking={step.booking} date={selectedDate} timeZone={state.owner.timezone} />
+        )}
+        {state.status === 'ready' && step.name === 'time' && (
           <>
             <Steps current={2} />
             <div className="grid items-start gap-4 md:grid-cols-[1fr_1.4fr_1fr]">
@@ -95,8 +119,7 @@ function BookingPage() {
               />
             </div>
             <div className="flex justify-end">
-              {/* Переход на экран подтверждения подключает тикет создания Booking */}
-              <Button size="lg" disabled={!selectedSlot}>
+              <Button size="lg" disabled={!selectedSlot} onClick={() => setStep({ name: 'confirm' })}>
                 Продолжить
               </Button>
             </div>

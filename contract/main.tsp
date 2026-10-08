@@ -27,6 +27,12 @@ union ApiErrorCode {
   /** EventType с таким id не существует. */
   "EVENT_TYPE_NOT_FOUND",
 
+  /** Начало Booking пересекается с другой Booking с учётом Buffer. */
+  "SLOT_TAKEN",
+
+  /** Начало Booking не на сетке, вне BookingWindow или WorkingHours, в выходной или внутри MinimumNotice. */
+  "SLOT_UNAVAILABLE",
+
   /** Непредвиденная ошибка сервера. */
   "INTERNAL_ERROR",
 }
@@ -122,6 +128,57 @@ model BookingWindowDay {
   slots: Slot[];
 }
 
+/** Сводка EventType внутри Booking. */
+model EventTypeSummary {
+  @format("uuid")
+  id: string;
+
+  name: string;
+}
+
+/** Booking — бронь Guest на интервал `[начало, конец)`. */
+model Booking {
+  /** Системный id (UUID): его назначает сервер. */
+  @format("uuid")
+  id: string;
+
+  /** Начало (UTC). */
+  start: utcDateTime;
+
+  /** Конец (UTC): начало плюс длительность EventType, без Buffer. */
+  end: utcDateTime;
+
+  /** Имя Guest. */
+  guestName: string;
+
+  /** Email Guest; регистр не меняется. */
+  guestEmail: string;
+
+  /** Момент создания. */
+  createdAt: utcDateTime;
+
+  eventType: EventTypeSummary;
+}
+
+/** Данные новой Booking; конец, id и момент создания назначает сервер. */
+model NewBooking {
+  /** EventType, в рамках которого Guest бронирует время. */
+  eventTypeId: string;
+
+  /** Начало выбранного Slot (UTC); сервер заново проверяет все правила на момент запроса. */
+  start: utcDateTime;
+
+  /** Имя Guest. Сервер обрезает пробелы по краям, имя из одних пробелов — пустое. */
+  @minLength(1)
+  @maxLength(100)
+  guestName: string;
+
+  /** Email Guest. Пробелы по краям допустимы: сервер их обрезает. */
+  @maxLength(254)
+  @pattern("^\\s*[^\\s@]+@[^\\s@]+\\.[^\\s@]+\\s*$")
+  guestEmail: string;
+}
+
 /** Проверка живости: используется smoke-тестом и Docker HEALTHCHECK. */
 @route("/health")
 @get
@@ -163,3 +220,15 @@ op getEventType(@path eventTypeId: string): EventType | ApiError;
 @get
 @operationId("listSlots")
 op listSlots(@path eventTypeId: string): BookingWindowDay[] | ApiError;
+
+/**
+ * Создаёт Booking на свободный Slot. Конец вычисляет сервер; занятый Slot отклоняется
+ * с `SLOT_TAKEN` (409), недоступное начало — с `SLOT_UNAVAILABLE` (422).
+ */
+@route("/bookings")
+@post
+@operationId("createBooking")
+op createBooking(@body body: NewBooking): {
+  @statusCode statusCode: 201;
+  @body body: Booking;
+} | ApiError;

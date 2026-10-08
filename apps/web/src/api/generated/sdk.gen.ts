@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetEventTypeData, GetEventTypeErrors, GetEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses, ListSlotsData, ListSlotsErrors, ListSlotsResponses } from './types.gen.ts';
+import type { CreateBookingData, CreateBookingErrors, CreateBookingResponses, CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, GetEventTypeData, GetEventTypeErrors, GetEventTypeResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetOwnerData, GetOwnerErrors, GetOwnerResponses, ListEventTypesData, ListEventTypesErrors, ListEventTypesResponses, ListSlotsData, ListSlotsErrors, ListSlotsResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,19 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Создаёт Booking на свободный Slot. Конец вычисляет сервер; занятый Slot отклоняется
+ * с `SLOT_TAKEN` (409), недоступное начало — с `SLOT_UNAVAILABLE` (422).
+ */
+export const createBooking = <ThrowOnError extends boolean = false>(options: Options<CreateBookingData, ThrowOnError>): RequestResult<CreateBookingResponses, CreateBookingErrors, ThrowOnError> => (options.client ?? client).post<CreateBookingResponses, CreateBookingErrors, ThrowOnError>({
+    url: '/api/bookings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Все EventType по возрастанию времени создания.

@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookingWindowDay, SlotStatus } from '@/api/generated'
-import { renderApp, stubApi } from '@/testing.tsx'
+import { renderApp, stubApi, type StubResponse } from '@/testing.tsx'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -42,16 +42,40 @@ function bookingWindow(first: string, statusesByDate: Record<string, SlotStatus[
   })
 }
 
-// API для экрана выбора времени и публичной страницы (куда ведут ссылки возврата)
+// Ответ createBooking по умолчанию: бронь из тела запроса, конец — начало плюс 30 минут
+async function bookingCreated(request: Request): Promise<StubResponse> {
+  // Копия: тест сам читает тело отправленного запроса
+  const body = await request.clone().json()
+  return [
+    201,
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      start: body.start,
+      end: new Date(Date.parse(body.start) + 30 * 60_000).toISOString(),
+      guestName: body.guestName,
+      guestEmail: body.guestEmail,
+      createdAt: '2026-10-06T07:00:00.000Z',
+      eventType: { id: eventType.id, name: eventType.name },
+    },
+  ]
+}
+
+// API для экрана выбора времени, подтверждения и публичной страницы (куда ведут ссылки возврата)
 function stubBookingApi({
   ownerData = owner,
   days = bookingWindow('2026-10-06'),
-}: { ownerData?: typeof owner; days?: BookingWindowDay[] } = {}) {
+  createBooking = bookingCreated,
+}: {
+  ownerData?: typeof owner
+  days?: BookingWindowDay[]
+  createBooking?: (request: Request) => Promise<StubResponse>
+} = {}) {
   return stubApi({
     'GET /api/owner': [200, ownerData],
     'GET /api/event-types': [200, [eventType]],
     [`GET /api/event-types/${eventType.id}`]: [200, eventType],
     [`GET /api/event-types/${eventType.id}/slots`]: [200, days],
+    'POST /api/bookings': createBooking,
   })
 }
 
@@ -346,5 +370,140 @@ describe('колонка «Статус слотов»', () => {
 
     expect(slotButtonNames()).toEqual(['11:00–11:30 Свободно', '11:15–11:45 Занято'])
     expect(screen.getByRole('region', { name: 'Информация' })).toHaveTextContent('Время: 11:00–11:30')
+  })
+})
+
+describe('подтверждение и создание Booking', () => {
+  // Выбирает слот 09:30–10:00 среды 7 октября и переходит к подтверждению
+  async function continueWithSlot() {
+    await openBookingPage()
+    await userEvent.click(dayButton('среда, 7 октября'))
+    await userEvent.click(slotButton('09:30–10:00'))
+    await userEvent.click(continueButton())
+    return screen.findByRole('heading', { name: 'Подтверждение записи' })
+  }
+
+  function confirmButton() {
+    return screen.getByRole('button', { name: 'Подтвердить запись' })
+  }
+
+  // Тела отправленных запросов createBooking
+  function bookingRequests(fetchMock: ReturnType<typeof stubBookingApi>) {
+    return fetchMock.mock.calls
+      .map(([request]) => request)
+      .filter((request) => request.method === 'POST' && new URL(request.url).pathname === '/api/bookings')
+  }
+
+  it('«Продолжить» ведёт на подтверждение со сводкой выбора', async () => {
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }) })
+
+    await continueWithSlot()
+
+    const confirmation = screen.getByRole('region', { name: 'Подтверждение записи' })
+    expect(confirmation).toHaveTextContent('Встреча 30 минут')
+    expect(confirmation).toHaveTextContent('среда, 7 октября')
+    expect(confirmation).toHaveTextContent('09:30–10:00')
+    expect(screen.getByText('3. Ваши данные')).toHaveAttribute('aria-current', 'step')
+    expect(screen.queryByRole('region', { name: 'Календарь' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['пустые поля', '', '', ['Укажите имя', 'Укажите email']],
+    ['поля из одних пробелов', '   ', '  ', ['Укажите имя', 'Укажите email']],
+    ['неверный email', 'Иван', 'ivan@example', ['Неверный формат email']],
+    ['слишком длинные значения', 'и'.repeat(101), `${'a'.repeat(243)}@example.com`, [
+      'Не длиннее 100 символов',
+      'Не длиннее 254 символов',
+    ]],
+  ])('ошибки под полями видны до отправки: %s', async (_title, name, email, errors) => {
+    const fetchMock = stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }) })
+    await continueWithSlot()
+
+    // paste, а не type: длинные значения посимвольно вводятся слишком долго
+    await userEvent.click(screen.getByLabelText('Имя'))
+    if (name) await userEvent.paste(name)
+    await userEvent.click(screen.getByLabelText('Email'))
+    if (email) await userEvent.paste(email)
+    await userEvent.click(confirmButton())
+
+    for (const error of errors) {
+      expect(screen.getByText(error)).toBeInTheDocument()
+    }
+    expect(bookingRequests(fetchMock)).toEqual([])
+  })
+
+  it('ошибка под полем пропадает после исправления ввода', async () => {
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }) })
+    await continueWithSlot()
+    await userEvent.click(confirmButton())
+    expect(screen.getByLabelText('Имя')).toHaveAccessibleDescription('Укажите имя')
+
+    await userEvent.type(screen.getByLabelText('Имя'), 'Иван')
+
+    expect(screen.queryByText('Укажите имя')).not.toBeInTheDocument()
+    expect(screen.getByText('Укажите email')).toBeInTheDocument()
+  })
+
+  it('«Изменить» возвращает к выбору времени с сохранённым слотом', async () => {
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }) })
+    await continueWithSlot()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Изменить' }))
+
+    expect(screen.getByRole('region', { name: 'Календарь' })).toBeInTheDocument()
+    expect(dayButton('среда, 7 октября')).toHaveAttribute('aria-pressed', 'true')
+    expect(slotButton('09:30–10:00')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('region', { name: 'Информация' })).toHaveTextContent('Время: 09:30–10:00')
+    expect(continueButton()).toBeEnabled()
+  })
+
+  it('«Подтвердить запись» отправляет createBooking с обрезанными значениями и показывает подтверждение', async () => {
+    const fetchMock = stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }),
+    })
+    await continueWithSlot()
+
+    await userEvent.type(screen.getByLabelText('Имя'), '  Иван Петров ')
+    await userEvent.type(screen.getByLabelText('Email'), ' ivan@example.com  ')
+    await userEvent.click(confirmButton())
+
+    expect(
+      await screen.findByRole('heading', { name: 'Бронь подтверждена. До встречи!' }),
+    ).toBeInTheDocument()
+    const [request] = bookingRequests(fetchMock)
+    expect(await request.json()).toEqual({
+      eventTypeId: eventType.id,
+      start: '2026-10-07T06:30:00.000Z',
+      guestName: 'Иван Петров',
+      guestEmail: 'ivan@example.com',
+    })
+    const summary = screen.getByRole('region', { name: 'Бронь подтверждена. До встречи!' })
+    expect(summary).toHaveTextContent('Встреча 30 минут')
+    expect(summary).toHaveTextContent('среда, 7 октября')
+    expect(summary).toHaveTextContent('09:30–10:00')
+    expect(summary).toHaveTextContent('Иван Петров')
+    expect(summary).toHaveTextContent('ivan@example.com')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Забронировать ещё' }))
+
+    expect(await screen.findByRole('link', { name: /Встреча 30 минут/ })).toHaveAttribute(
+      'href',
+      `/booking/${eventType.id}`,
+    )
+  })
+
+  it('при отказе сервера показывает общее сообщение формы', async () => {
+    stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'free', 'free'] }),
+      createBooking: async () => [500, { code: 'INTERNAL_ERROR', message: 'Ошибка' }],
+    })
+    await continueWithSlot()
+
+    await userEvent.type(screen.getByLabelText('Имя'), 'Иван')
+    await userEvent.type(screen.getByLabelText('Email'), 'ivan@example.com')
+    await userEvent.click(confirmButton())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось создать бронь')
+    expect(confirmButton()).toBeEnabled()
   })
 })

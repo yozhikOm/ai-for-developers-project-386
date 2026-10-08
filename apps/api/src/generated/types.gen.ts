@@ -18,7 +18,38 @@ export type ApiError = {
 /**
  * Машиночитаемая причина ошибки: клиент различает отказы по ней, а не по тексту.
  */
-export type ApiErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'EVENT_TYPE_NOT_FOUND' | 'INTERNAL_ERROR';
+export type ApiErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'EVENT_TYPE_NOT_FOUND' | 'SLOT_TAKEN' | 'SLOT_UNAVAILABLE' | 'INTERNAL_ERROR';
+
+/**
+ * Booking — бронь Guest на интервал `[начало, конец)`.
+ */
+export type Booking = {
+    /**
+     * Системный id (UUID): его назначает сервер.
+     */
+    id: string;
+    /**
+     * Начало (UTC).
+     */
+    start: string;
+    /**
+     * Конец (UTC): начало плюс длительность EventType, без Buffer.
+     */
+    end: string;
+    /**
+     * Имя Guest.
+     */
+    guestName: string;
+    /**
+     * Email Guest; регистр не меняется.
+     */
+    guestEmail: string;
+    /**
+     * Момент создания.
+     */
+    createdAt: string;
+    eventType: EventTypeSummary;
+};
 
 /**
  * День BookingWindow со слотами выбранного EventType.
@@ -66,10 +97,40 @@ export type EventType = {
 };
 
 /**
+ * Сводка EventType внутри Booking.
+ */
+export type EventTypeSummary = {
+    id: string;
+    name: string;
+};
+
+/**
  * Ответ проверки живости.
  */
 export type Health = {
     status: 'ok';
+};
+
+/**
+ * Данные новой Booking; конец, id и момент создания назначает сервер.
+ */
+export type NewBooking = {
+    /**
+     * EventType, в рамках которого Guest бронирует время.
+     */
+    eventTypeId: string;
+    /**
+     * Начало выбранного Slot (UTC); сервер заново проверяет все правила на момент запроса.
+     */
+    start: string;
+    /**
+     * Имя Guest. Сервер обрезает пробелы по краям, имя из одних пробелов — пустое.
+     */
+    guestName: string;
+    /**
+     * Email Guest. Пробелы по краям допустимы: сервер их обрезает.
+     */
+    guestEmail: string;
 };
 
 /**
@@ -123,6 +184,31 @@ export type Slot = {
  * Статус Slot: «свободен» или «занят» пересечением с Booking с учётом Buffer.
  */
 export type SlotStatus = 'free' | 'taken';
+
+export type CreateBookingData = {
+    body: NewBooking;
+    path?: never;
+    query?: never;
+    url: '/api/bookings';
+};
+
+export type CreateBookingErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ApiError;
+};
+
+export type CreateBookingError = CreateBookingErrors[keyof CreateBookingErrors];
+
+export type CreateBookingResponses = {
+    /**
+     * The request has succeeded and a new resource has been created as a result.
+     */
+    201: Booking;
+};
+
+export type CreateBookingResponse = CreateBookingResponses[keyof CreateBookingResponses];
 
 export type ListEventTypesData = {
     body?: never;
