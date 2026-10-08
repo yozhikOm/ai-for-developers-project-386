@@ -36,6 +36,8 @@
   окружение каждый пакет описывает в своём конфиге.
 - `eslint.config.mjs` (корень) — единый ESLint 10 flat config.
 - `Dockerfile` — multi-stage образ: backend раздаёт API и собранную статику frontend.
+  Порт — из `PORT` (по умолчанию 3000). Деплой: Render, Docker web service
+  (free) с авто-деплоем из `main`; `PORT` там задаёт платформа. Ссылка — в README.
 
 ## Команды
 
