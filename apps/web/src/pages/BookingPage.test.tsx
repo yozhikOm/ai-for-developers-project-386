@@ -32,8 +32,7 @@ function bookingWindow(first: string, statusesByDate: Record<string, SlotStatus[
     return {
       date,
       isWorkingDay: true,
-      // Время слотов условное (с 06:00 UTC с шагом 15 минут): экран пока показывает
-      // только счётчики, а они считаются по статусам
+      // Слоты по 30 минут с 06:00 UTC (09:00 по Москве) с шагом 15 минут
       slots: statuses.map((status, index) => ({
         start: new Date(Date.parse(`${date}T06:00:00.000Z`) + index * 15 * 60_000).toISOString(),
         end: new Date(Date.parse(`${date}T06:30:00.000Z`) + index * 15 * 60_000).toISOString(),
@@ -64,6 +63,25 @@ async function openBookingPage() {
 // Кнопка дня календаря по полной дате, например «среда, 7 октября»
 function dayButton(label: string) {
   return screen.getByRole('button', { name: new RegExp(`^${label}`) })
+}
+
+function slotColumn() {
+  return screen.getByRole('region', { name: 'Статус слотов' })
+}
+
+// Слоты колонки по порядку: «интервал статус»
+function slotButtonNames() {
+  return within(slotColumn())
+    .getAllByRole('button')
+    .map((button) => button.textContent)
+}
+
+function slotButton(range: string) {
+  return within(slotColumn()).getByRole('button', { name: new RegExp(`^${range}`) })
+}
+
+function continueButton() {
+  return screen.getByRole('button', { name: 'Продолжить' })
 }
 
 describe('экран выбора времени', () => {
@@ -219,5 +237,114 @@ describe('календарь BookingWindow', () => {
     expect(screen.getByText('Время указано по Екатеринбургу (UTC+5)')).toBeInTheDocument()
     expect(dayButton('среда, 7 октября')).toHaveTextContent('3 св.')
     expect(dayButton('вторник, 6 октября')).toBeDisabled()
+  })
+})
+
+describe('колонка «Статус слотов»', () => {
+  it('пока день не выбран, просит выбрать дату, а «Продолжить» неактивна', async () => {
+    stubBookingApi()
+    await openBookingPage()
+
+    expect(slotColumn()).toHaveTextContent('Выберите дату в календаре')
+    expect(continueButton()).toBeDisabled()
+  })
+
+  it('после выбора дня показывает все слоты дня с интервалами в поясе Owner и статусами', async () => {
+    stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'taken', 'free'] }),
+    })
+    await openBookingPage()
+
+    await userEvent.click(dayButton('среда, 7 октября'))
+
+    expect(slotButtonNames()).toEqual([
+      '09:00–09:30 Свободно',
+      '09:15–09:45 Занято',
+      '09:30–10:00 Свободно',
+    ])
+    expect(slotColumn()).not.toHaveTextContent('Выберите дату в календаре')
+  })
+
+  it('занятый слот не нажимается, выбранный свободный подсвечен и показан в «Информации»', async () => {
+    stubBookingApi({
+      days: bookingWindow('2026-10-06', { '2026-10-07': ['free', 'taken', 'free'] }),
+    })
+    await openBookingPage()
+    const info = screen.getByRole('region', { name: 'Информация' })
+    expect(info).toHaveTextContent('Дата: не выбрана')
+    expect(info).toHaveTextContent('Время: не выбрано')
+
+    await userEvent.click(dayButton('среда, 7 октября'))
+    expect(slotButton('09:15–09:45')).toBeDisabled()
+    expect(info).toHaveTextContent('Дата: среда, 7 октября')
+    expect(continueButton()).toBeDisabled()
+
+    await userEvent.click(slotButton('09:30–10:00'))
+
+    expect(slotButton('09:30–10:00')).toHaveAttribute('aria-pressed', 'true')
+    expect(slotButton('09:00–09:30')).toHaveAttribute('aria-pressed', 'false')
+    expect(info).toHaveTextContent('Время: 09:30–10:00')
+    expect(continueButton()).toBeEnabled()
+  })
+
+  it('выбор другого дня сбрасывает выбранный слот', async () => {
+    stubBookingApi()
+    await openBookingPage()
+    await userEvent.click(dayButton('среда, 7 октября'))
+    await userEvent.click(slotButton('09:00–09:30'))
+    expect(continueButton()).toBeEnabled()
+
+    await userEvent.click(dayButton('четверг, 8 октября'))
+
+    expect(slotButton('09:00–09:30')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('region', { name: 'Информация' })).toHaveTextContent('Время: не выбрано')
+    expect(continueButton()).toBeDisabled()
+  })
+
+  it('у рабочего дня без оставшихся слотов — «На этот день слотов не осталось»', async () => {
+    // Сегодня вечером: все слоты дня прошли или попали в MinimumNotice
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-06': [] }) })
+    await openBookingPage()
+
+    await userEvent.click(dayButton('вторник, 6 октября'))
+
+    expect(slotColumn()).toHaveTextContent('На этот день слотов не осталось')
+    expect(within(slotColumn()).queryAllByRole('button')).toEqual([])
+    expect(slotColumn()).not.toHaveTextContent('Все слоты заняты')
+  })
+
+  it('если все слоты дня заняты — «Все слоты заняты — выберите другой день»', async () => {
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-08': ['taken', 'taken'] }) })
+    await openBookingPage()
+
+    await userEvent.click(dayButton('четверг, 8 октября'))
+
+    expect(slotColumn()).toHaveTextContent('Все слоты заняты — выберите другой день')
+    expect(slotButtonNames()).toEqual(['09:00–09:30 Занято', '09:15–09:45 Занято'])
+    expect(slotColumn()).not.toHaveTextContent('На этот день слотов не осталось')
+  })
+
+  it('у дня со свободными слотами пустых состояний нет', async () => {
+    stubBookingApi({ days: bookingWindow('2026-10-06', { '2026-10-07': ['taken', 'free'] }) })
+    await openBookingPage()
+
+    await userEvent.click(dayButton('среда, 7 октября'))
+
+    expect(slotColumn()).not.toHaveTextContent('Все слоты заняты')
+    expect(slotColumn()).not.toHaveTextContent('На этот день слотов не осталось')
+  })
+
+  it('интервалы — в поясе Owner независимо от пояса jsdom', async () => {
+    stubBookingApi({
+      ownerData: { ...owner, timezone: 'Asia/Yekaterinburg' },
+      days: bookingWindow('2026-10-07', { '2026-10-07': ['free', 'taken'] }),
+    })
+    await openBookingPage()
+
+    await userEvent.click(dayButton('среда, 7 октября'))
+    await userEvent.click(slotButton('11:00–11:30'))
+
+    expect(slotButtonNames()).toEqual(['11:00–11:30 Свободно', '11:15–11:45 Занято'])
+    expect(screen.getByRole('region', { name: 'Информация' })).toHaveTextContent('Время: 11:00–11:30')
   })
 })

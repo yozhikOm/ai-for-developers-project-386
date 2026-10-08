@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   getEventType,
@@ -7,11 +7,13 @@ import {
   type BookingWindowDay,
   type EventType,
   type Owner,
+  type Slot,
 } from '@/api/generated'
 import BookingCalendar from '@/components/BookingCalendar'
-import { buttonVariants } from '@/components/ui/button'
+import BookingInfo from '@/components/BookingInfo'
+import SlotList from '@/components/SlotList'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
 
 type PageState =
   | { status: 'loading' }
@@ -23,11 +25,17 @@ const STEPS = ['Тип встречи', 'Дата и время', 'Ваши да
 
 // Экран выбора времени для EventType (/booking/:eventTypeId): шаг «Дата и время».
 // Открывается и по прямой ссылке: всё нужное загружает сам по id из URL.
-// Колонку «Статус слотов» добавит следующий тикет.
 function BookingPage() {
   const { eventTypeId = '' } = useParams()
   const [state, setState] = useState<PageState>({ status: 'loading' })
   const [selectedDate, setSelectedDate] = useState<string>()
+  const [selectedSlot, setSelectedSlot] = useState<Slot>()
+
+  // Слот выбирается внутри дня: при смене дня выбор сбрасывается
+  function selectDate(date: string) {
+    if (date !== selectedDate) setSelectedSlot(undefined)
+    setSelectedDate(date)
+  }
 
   useEffect(() => {
     // Ответ после ухода со страницы игнорируем
@@ -66,14 +74,31 @@ function BookingPage() {
         {state.status === 'ready' && (
           <>
             <Steps current={2} />
-            <div className="grid items-start gap-4 md:grid-cols-[1fr_1.4fr]">
-              <EventTypeInfo owner={state.owner} eventType={state.eventType} />
+            <div className="grid items-start gap-4 md:grid-cols-[1fr_1.4fr_1fr]">
+              <BookingInfo
+                owner={state.owner}
+                eventType={state.eventType}
+                selectedDate={selectedDate}
+                selectedSlot={selectedSlot}
+              />
               <BookingCalendar
                 days={state.days}
                 timeZone={state.owner.timezone}
                 selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
+                onSelectDate={selectDate}
               />
+              <SlotList
+                day={state.days.find((day) => day.date === selectedDate)}
+                timeZone={state.owner.timezone}
+                selectedStart={selectedSlot?.start}
+                onSelectSlot={setSelectedSlot}
+              />
+            </div>
+            <div className="flex justify-end">
+              {/* Переход на экран подтверждения подключает тикет создания Booking */}
+              <Button size="lg" disabled={!selectedSlot}>
+                Продолжить
+              </Button>
             </div>
           </>
         )}
@@ -99,29 +124,6 @@ function Steps({ current }: { current: number }) {
         )
       })}
     </ol>
-  )
-}
-
-// Колонка «Информация»: к кому и на какой звонок записывается Guest
-function EventTypeInfo({ owner, eventType }: { owner: Owner; eventType: EventType }) {
-  const headingId = useId()
-  return (
-    <Card role="region" aria-labelledby={headingId}>
-      <CardHeader>
-        <h2 id={headingId} className="font-heading font-medium">
-          Информация
-        </h2>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2">
-        <p className="text-muted-foreground">{owner.name}</p>
-        <p className="font-medium">{eventType.name}</p>
-        <p>{eventType.durationMinutes} мин</p>
-        {eventType.description && <p className="text-muted-foreground">{eventType.description}</p>}
-        <Link to="/" className={cn(buttonVariants({ variant: 'ghost' }), 'self-start')}>
-          ← Другой тип
-        </Link>
-      </CardContent>
-    </Card>
   )
 }
 
