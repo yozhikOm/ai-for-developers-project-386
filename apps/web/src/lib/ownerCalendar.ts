@@ -59,6 +59,17 @@ export function formatDayLabel(date: string): string {
   return dayLabelFormat.format(plainDateToUtc(date))
 }
 
+// Интервал слота по поясу Owner: «09:00–09:30». start и end — моменты UTC (ISO 8601)
+export function formatTimeRange(start: string, end: string, timeZone: string): string {
+  const format = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  })
+  return `${format.format(new Date(start))}–${format.format(new Date(end))}`
+}
+
 // Названия поясов России в дательном падеже: «по Москве»
 const TIME_ZONE_PLACES: Record<string, string> = {
   'Europe/Kaliningrad': 'Калининграду',
